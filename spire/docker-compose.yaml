@@ -1,0 +1,21 @@
+services:
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.11.0
+    container_name: spire-server
+    volumes:
+      - ./server:/run/spire/config:ro
+      - ./data/server:/run/spire/data:rw
+    command: ["-config", "/run/spire/config/server.conf"]
+    network_mode: host
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.11.0
+    container_name: spire-agent
+    volumes:
+      - ./agent:/run/spire/config:ro
+      - ./data/agent:/run/spire/data:rw
+      - ./socket:/run/spire/sockets:rw
+    command: ["-config", "/run/spire/config/agent.conf"]
+    network_mode: host
+    depends_on:
+      - spire-server

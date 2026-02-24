@@ -1,0 +1,11 @@
+services:
+  a2a-proxy:
+    image: nginx:alpine
+    container_name: mpx-a2a-proxy
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:9000:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    security_opt:
+      - no-new-privileges:true

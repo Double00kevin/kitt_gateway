@@ -1,0 +1,18 @@
+services:
+  inference-edge:
+    image: ollama/ollama:latest
+    container_name: mpx-inference-edge
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ./models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    security_opt:
+      - no-new-privileges:true

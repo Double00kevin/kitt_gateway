@@ -1,0 +1,19 @@
+{
+  "@context": "https://madprojx.com/ns/agent-card/v1",
+  "agent_id": "spiffe://mpx.sovereign/kitt_node/edge_router",
+  "name": "KITT Edge Inference Router",
+  "description": "Local Llama-3.2 SLM for prompt evaluation, PII masking, and local routing.",
+  "endpoints": {
+    "inference": "http://127.0.0.1:11434/api/generate",
+    "context_store": "redis://127.0.0.1:6379"
+  },
+  "protocols": [
+    "A2A-JSON-RPC-2.0",
+    "CA-MCP"
+  ],
+  "capabilities": [
+    "pii_masking",
+    "intent_classification",
+    "local_routing"
+  ]
+}

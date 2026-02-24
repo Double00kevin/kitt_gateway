@@ -1,0 +1,27 @@
+services:
+  gateway-sandbox:
+    image: ubuntu:24.04
+    container_name: kitt_sandbox
+    networks:
+      - kitt_sovereign_net
+    volumes:
+      # Read-only mounts for config to prevent tampering
+      - ./config:/app/config:ro
+      - ./mcp:/app/mcp:ro
+      # Read-write mounts for memory and logging
+      - ./shared_context:/app/shared_context:rw
+      - ./logs:/app/logs:rw
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    security_opt:
+      - no-new-privileges:true
+    command: tail -f /dev/null
+
+networks:
+  kitt_sovereign_net:
+    external: true
