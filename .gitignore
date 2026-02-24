@@ -1,0 +1,27 @@
+# OS/Editor Noise
+.DS_Store
+.vscode/
+.idea/
+
+# Identity Layer & Cryptography (CRITICAL)
+spire/data/
+spire/socket/
+*.sqlite3
+*.sock
+*.pem
+*.key
+
+# Environment Variables & Secrets
+.env
+.env.*
+security/secrets/
+
+# Python & Orchestration (LangGraph / MCP)
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Edge Inference (Ollama / vLLM)
+models/
+*.gguf
