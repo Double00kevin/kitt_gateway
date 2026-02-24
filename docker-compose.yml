@@ -11,6 +11,7 @@ services:
       # Read-write mounts for memory and logging
       - ./shared_context:/app/shared_context:rw
       - ./logs:/app/logs:rw
+      - /home/doubl/kitt_gateway/spire/socket:/run/spire/sockets:ro
     deploy:
       resources:
         reservations:
