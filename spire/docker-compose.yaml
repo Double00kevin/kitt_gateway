@@ -14,7 +14,7 @@ services:
     volumes:
       - ./agent:/run/spire/config:ro
       - ./data/agent:/run/spire/data:rw
-      - ./socket:/run/spire/sockets:rw
+      - /home/doubl/kitt_gateway/spire/sockets:/run/spire/sockets:rw
     command: ["-config", "/run/spire/config/agent.conf"]
     network_mode: host
     depends_on:
