@@ -1,9 +1,0 @@
-2026-02-23 22:25:57,554 | ATS_EVENT | {"agent_id": "spiffe://mpx.sovereign/kitt_node/edge_router", "action": "intent_received"}
-2026-02-23 22:25:57,555 | ATS_EVENT | {"action": "memory_read", "target": "redis_scs", "key": "mission_status"}
-2026-02-23 22:26:06,337 | ATS_EVENT | {"action": "inference_complete", "status": "success"}
-2026-02-23 22:26:06,338 | ATS_EVENT | {"action": "memory_write", "target": "redis_scs", "key": "mission_status"}
-2026-02-23 22:31:45,685 | ATS_EVENT | {"agent_id": "spiffe://mpx.sovereign/kitt_node/edge_router", "action": "intent_received"}
-2026-02-23 22:31:45,687 | ATS_EVENT | {"action": "memory_read", "target": "redis_scs", "key": "mission_status"}
-2026-02-23 22:31:47,155 | ATS_EVENT | HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
-2026-02-23 22:31:49,834 | ATS_EVENT | {"action": "inference_complete", "status": "success"}
-2026-02-23 22:31:49,835 | ATS_EVENT | {"action": "memory_write", "target": "redis_scs", "key": "mission_status"}
