@@ -1,0 +1,12 @@
+services:
+  shared-context:
+    image: redis:alpine
+    container_name: mpx-shared-context
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ./data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    security_opt:
+      - no-new-privileges:true

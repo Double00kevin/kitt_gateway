@@ -25,3 +25,7 @@ venv/
 # Edge Inference (Ollama / vLLM)
 models/
 *.gguf
+
+# Shared Context Store (Redis)
+shared_context/data/
+*.rdb
