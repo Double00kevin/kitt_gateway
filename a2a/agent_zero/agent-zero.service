@@ -1,0 +1,17 @@
+[Unit]
+Description=KITT Agent Zero (Sovereign Administrator)
+After=network.target docker.service
+
+[Service]
+User=doubl
+Group=doubl
+WorkingDirectory=/home/doubl/kitt_gateway/a2a/agent_zero
+ExecStart=/home/doubl/kitt_gateway/a2a/agent_zero/venv/bin/python /home/doubl/kitt_gateway/a2a/agent_zero/agent.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
