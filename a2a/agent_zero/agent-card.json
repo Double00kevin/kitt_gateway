@@ -1,0 +1,25 @@
+{
+  "agent_id": "agent_zero",
+  "version": "1.0.0",
+  "identity": {
+    "name": "KITT Agent Zero",
+    "role": "Primary Autonomous Actor",
+    "spiffe_id": "spiffe://kitt.local/agent_zero"
+  },
+  "capabilities": [
+    {
+      "type": "mcp_memory",
+      "description": "Read/Write access to the Shared Context Store via Redis",
+      "endpoint": "http://localhost:8000"
+    },
+    {
+      "type": "inference_edge",
+      "description": "Local Llama 3.2 execution on NVIDIA 1050 Ti",
+      "endpoint": "http://localhost:11434"
+    }
+  ],
+  "security": {
+    "intent_gate_required": true,
+    "pqc_standard": "ML-KEM-768"
+  }
+}

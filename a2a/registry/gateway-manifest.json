@@ -1,0 +1,33 @@
+{
+    "gateway_id": "KITT-Sovereign-Gateway",
+    "version": "1.1.0",
+    "architecture": "MadProjx-v1",
+    "capabilities": [
+        "identity-provider (SPIRE)",
+        "context-storage (Redis/MCP)",
+        "inference-routing"
+    ],
+    "services": {
+        "discovery": "a2a/registry",
+        "rpc_port": 9000,
+        "context_port": 8000
+    },
+    "security_policy": "strict-mpx-v1",
+    "active_agents": [
+        {
+            "id": "agent_zero",
+            "name": "KITT System Administrator",
+            "status": "active",
+            "version": "1.2.0",
+            "manifest_path": "/home/doubl/kitt_gateway/a2a/agent_zero/agent-card.json",
+            "endpoint": "local_process",
+            "capabilities": [
+                "mcp_memory",
+                "inference_edge",
+                "system_telemetry",
+                "docker_monitoring"
+            ],
+            "last_updated": "2026-02-24T16:09:19.683387"
+        }
+    ]
+}
