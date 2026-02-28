@@ -1,0 +1,17 @@
+services:
+  mcp-server:
+    build: .
+    container_name: mpx-mcp-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - REDIS_HOST=mpx-shared-context
+    networks:
+      - kitt_sovereign_net
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  kitt_sovereign_net:
+    external: true

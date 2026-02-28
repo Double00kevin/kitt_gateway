@@ -10,3 +10,9 @@ services:
     command: redis-server --save 60 1 --loglevel warning
     security_opt:
       - no-new-privileges:true
+    networks:
+      - kitt_sovereign_net
+
+networks:
+  kitt_sovereign_net:
+    external: true

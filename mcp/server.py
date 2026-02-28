@@ -1,10 +1,11 @@
+import os
 import redis
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 
 # --- Configuration ---
-REDIS_HOST = "localhost"
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = 6379
 SPIRE_SOCKET = "/run/spire/sockets/agent.sock" # For future use
 

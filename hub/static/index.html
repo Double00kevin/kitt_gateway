@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K.I.T.T. — Knight Industries Two Thousand</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #000000;
+    --surface:   #0a0a0a;
+    --surface2:  #111111;
+    --border:    #1a1a1a;
+    --red:       #ff1a00;
+    --red-glow:  #ff4422;
+    --red-dim:   #3a0800;
+    --amber:     #ff8c00;
+    --text:      #cc9966;
+    --text-dim:  #664433;
+    --green:     #00ff41;
+
+    --claude:     #ff6b35;
+    --openai:     #00ff41;
+    --gemini:     #4488ff;
+    --grok:       #cc44ff;
+    --perplexity: #00ccff;
+    --local:      #ffcc00;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* CRT scanlines */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,0.18) 3px,
+      rgba(0,0,0,0.18) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* HEADER */
+  header {
+    background: #000;
+    border-bottom: 2px solid #1a0800;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .kitt-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1.5rem;
+    border-bottom: 1px solid #1a0800;
+  }
+
+  .kitt-logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 1.5rem;
+    letter-spacing: 0.3em;
+    color: var(--red);
+    text-shadow:
+      0 0 10px var(--red),
+      0 0 30px var(--red-glow),
+      0 0 60px rgba(255,26,0,0.3);
+  }
+
+  .kitt-subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.25em;
+    color: var(--text-dim);
+    margin-top: 0.15rem;
+  }
+
+  .kitt-status-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    font-family: 'Orbitron', monospace;
+  }
+
+  .status-led {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .status-led.online {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: ledpulse 2s infinite;
+  }
+  .status-led.error { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+  @keyframes ledpulse {
+    0%,100% { opacity:1; } 50% { opacity:0.4; }
+  }
+
+  /* SCANNER BAR */
+  .scanner-container {
+    background: #000;
+    padding: 7px 0;
+    border-bottom: 2px solid #1a0800;
+  }
+
+  .scanner-track {
+    width: 100%;
+    height: 20px;
+    background: #030000;
+    border-top: 1px solid #200800;
+    border-bottom: 1px solid #200800;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* LED segment dividers */
+  .scanner-track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 10px,
+      rgba(255,26,0,0.04) 10px,
+      rgba(255,26,0,0.04) 11px
+    );
+    z-index: 1;
+  }
+
+  .scanner-light {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 90px;
+    height: 16px;
+    border-radius: 8px;
+    background: radial-gradient(ellipse at center,
+      #ffffff 0%,
+      #ff6644 15%,
+      var(--red) 35%,
+      rgba(255,26,0,0.5) 65%,
+      transparent 100%
+    );
+    box-shadow:
+      0 0 6px 2px #fff,
+      0 0 14px 6px var(--red),
+      0 0 30px 12px rgba(255,26,0,0.5),
+      0 0 60px 20px rgba(255,26,0,0.2);
+    animation: scan 2.2s ease-in-out infinite;
+    z-index: 2;
+  }
+
+  @keyframes scan {
+    0%        { left: -90px; }
+    49.999%   { left: calc(100% + 90px); }
+    50%       { left: calc(100% + 90px); }
+    100%      { left: -90px; }
+  }
+
+  /* MODEL BAR */
+  .model-bar {
+    padding: 0.55rem 1.5rem;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    align-items: center;
+    border-bottom: 1px solid #1a0800;
+    background: #000;
+  }
+
+  .model-bar-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.52rem;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-right: 0.4rem;
+  }
+
+  .model-btn {
+    padding: 0.22rem 0.7rem;
+    border-radius: 2px;
+    border: 1px solid #2a1000;
+    background: #030000;
+    color: var(--text-dim);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.52rem;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .model-btn:hover { border-color: var(--red); color: var(--red); box-shadow: 0 0 8px rgba(255,26,0,0.3); }
+
+  .model-btn.active {
+    background: #150400;
+    border-color: var(--red);
+    color: var(--red);
+    box-shadow: 0 0 10px rgba(255,26,0,0.4), inset 0 0 6px rgba(255,26,0,0.08);
+    text-shadow: 0 0 8px var(--red);
+  }
+
+  .model-btn[data-model="claude"].active    { border-color:var(--claude);color:var(--claude);box-shadow:0 0 10px rgba(255,107,53,0.4);text-shadow:0 0 8px var(--claude); background:#120300; }
+  .model-btn[data-model="openai"].active    { border-color:var(--openai);color:var(--openai);box-shadow:0 0 10px rgba(0,255,65,0.4);text-shadow:0 0 8px var(--openai); background:#001200; }
+  .model-btn[data-model="gemini"].active    { border-color:var(--gemini);color:var(--gemini);box-shadow:0 0 10px rgba(68,136,255,0.4);text-shadow:0 0 8px var(--gemini); background:#000a1f; }
+  .model-btn[data-model="grok"].active      { border-color:var(--grok);color:var(--grok);box-shadow:0 0 10px rgba(204,68,255,0.4);text-shadow:0 0 8px var(--grok); background:#0d0018; }
+  .model-btn[data-model="perplexity"].active{ border-color:var(--perplexity);color:var(--perplexity);box-shadow:0 0 10px rgba(0,204,255,0.4);text-shadow:0 0 8px var(--perplexity); background:#00101a; }
+  .model-btn[data-model="local"].active     { border-color:var(--local);color:var(--local);box-shadow:0 0 10px rgba(255,204,0,0.4);text-shadow:0 0 8px var(--local); background:#141000; }
+
+  /* CHAT */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  #chat::-webkit-scrollbar { width: 3px; }
+  #chat::-webkit-scrollbar-track { background: #000; }
+  #chat::-webkit-scrollbar-thumb { background: #2a0800; }
+
+  .msg-user {
+    align-self: flex-end;
+    max-width: 68%;
+    background: #0a0300;
+    border: 1px solid #3a1500;
+    border-radius: 2px 2px 0 2px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: var(--amber);
+    animation: fadeUp 0.2s ease;
+  }
+
+  .msg-user::before {
+    content: 'DRIVER INPUT ►';
+    display: block;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.48rem;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-bottom: 0.3rem;
+  }
+
+  .response-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    animation: fadeUp 0.25s ease;
+  }
+
+  .response-card {
+    background: #030000;
+    border: 1px solid #1a0800;
+    border-left: 3px solid #2a0800;
+    border-radius: 2px;
+    overflow: hidden;
+    transition: border-left-color 0.2s;
+  }
+
+  .response-card[data-model="claude"]     { border-left-color: var(--claude); }
+  .response-card[data-model="openai"]     { border-left-color: var(--openai); }
+  .response-card[data-model="gemini"]     { border-left-color: var(--gemini); }
+  .response-card[data-model="grok"]       { border-left-color: var(--grok); }
+  .response-card[data-model="perplexity"] { border-left-color: var(--perplexity); }
+  .response-card[data-model="local"]      { border-left-color: var(--local); }
+
+  .response-header {
+    padding: 0.32rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #1a0800;
+    background: #060000;
+  }
+
+  .model-tag {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.52rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+  }
+
+  .model-tag.claude     { color:var(--claude);     text-shadow:0 0 8px var(--claude); }
+  .model-tag.openai     { color:var(--openai);     text-shadow:0 0 8px var(--openai); }
+  .model-tag.gemini     { color:var(--gemini);     text-shadow:0 0 8px var(--gemini); }
+  .model-tag.grok       { color:var(--grok);       text-shadow:0 0 8px var(--grok); }
+  .model-tag.perplexity { color:var(--perplexity); text-shadow:0 0 8px var(--perplexity); }
+  .model-tag.local      { color:var(--local);      text-shadow:0 0 8px var(--local); }
+
+  .response-ts { font-size: 0.48rem; color: var(--text-dim); letter-spacing: 0.1em; }
+
+  .response-body {
+    padding: 0.7rem 0.85rem;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    color: #aa7744;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .response-body.error { color: var(--red); }
+
+  /* Thinking */
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 0.85rem;
+    background: #030000;
+    border: 1px solid #1a0800;
+    border-radius: 2px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.52rem;
+    color: var(--red);
+    letter-spacing: 0.2em;
+    text-shadow: 0 0 8px var(--red);
+    animation: fadeUp 0.2s ease;
+  }
+
+  .mini-scanner {
+    width: 56px; height: 8px;
+    background: #0a0000;
+    border: 1px solid #2a0800;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .mini-scanner::after {
+    content: '';
+    position: absolute;
+    top: 1px; bottom: 1px;
+    width: 14px;
+    border-radius: 3px;
+    background: radial-gradient(ellipse, #fff 0%, var(--red) 50%, transparent 100%);
+    box-shadow: 0 0 6px var(--red);
+    animation: scan-mini 0.9s ease-in-out infinite;
+  }
+  @keyframes scan-mini {
+    0%,100% { left: 1px; }
+    50%     { left: calc(100% - 15px); }
+  }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    text-align: center;
+    padding: 3rem;
+  }
+
+  .kitt-emblem {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 5rem;
+    color: #1a0500;
+    letter-spacing: 0.4em;
+    text-shadow: 0 0 60px rgba(255,26,0,0.15), 0 0 120px rgba(255,26,0,0.08);
+    line-height: 1;
+    animation: emblem-breathe 4s ease-in-out infinite;
+  }
+
+  @keyframes emblem-breathe {
+    0%,100% { text-shadow: 0 0 40px rgba(255,26,0,0.1); color: #1a0500; }
+    50%     { text-shadow: 0 0 80px rgba(255,26,0,0.3), 0 0 30px rgba(255,26,0,0.2); color: #2a0a00; }
+  }
+
+  .kitt-tagline {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.52rem;
+    color: #331500;
+    letter-spacing: 0.3em;
+    line-height: 2.2;
+  }
+
+  /* INPUT BAR */
+  .input-bar {
+    padding: 0.85rem 1.5rem;
+    border-top: 2px solid #1a0800;
+    background: #000;
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+  }
+
+  .input-wrapper { flex: 1; }
+
+  .input-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.48rem;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-bottom: 0.28rem;
+  }
+
+  #prompt-input {
+    width: 100%;
+    background: #030000;
+    border: 1px solid #2a1000;
+    border-radius: 2px;
+    color: var(--amber);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    resize: none;
+    min-height: 44px;
+    max-height: 140px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    line-height: 1.5;
+    caret-color: var(--red);
+  }
+
+  #prompt-input:focus {
+    border-color: var(--red);
+    box-shadow: 0 0 14px rgba(255,26,0,0.2), inset 0 0 8px rgba(255,26,0,0.04);
+  }
+  #prompt-input::placeholder { color: #442200; }
+
+  #send-btn {
+    background: #100300;
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 2px;
+    padding: 0 1.25rem;
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+    transition: all 0.15s;
+    height: 44px;
+    text-shadow: 0 0 8px var(--red);
+    box-shadow: 0 0 10px rgba(255,26,0,0.2);
+  }
+
+  #send-btn:hover {
+    background: #200600;
+    box-shadow: 0 0 20px rgba(255,26,0,0.5), inset 0 0 10px rgba(255,26,0,0.08);
+    text-shadow: 0 0 16px var(--red);
+  }
+  #send-btn:active   { transform: scale(0.97); }
+  #send-btn:disabled { background:#050000; color:#331500; border-color:#1a0800; box-shadow:none; text-shadow:none; cursor:not-allowed; }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(6px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kitt-top-bar">
+    <div>
+      <div class="kitt-logo">K.I.T.T.</div>
+      <div class="kitt-subtitle">KNIGHT INDUSTRIES TWO THOUSAND — SOVEREIGN AI HUB</div>
+    </div>
+    <div class="kitt-status-panel">
+      <div class="status-row">
+        <div class="status-led" id="status-dot"></div>
+        <span id="status-text">INITIALIZING...</span>
+      </div>
+      <div class="status-row" style="font-size:0.48rem;color:#2a1000;letter-spacing:0.15em;">
+        MADPROJX SOVEREIGN GATEWAY
+      </div>
+    </div>
+  </div>
+  <div class="scanner-container">
+    <div class="scanner-track">
+      <div class="scanner-light"></div>
+    </div>
+  </div>
+</header>
+
+<div class="model-bar">
+  <span class="model-bar-label">AI SYSTEMS:</span>
+  <button class="model-btn active" data-model="all">◈ ALL</button>
+  <button class="model-btn" data-model="claude">Claude</button>
+  <button class="model-btn" data-model="openai">ChatGPT</button>
+  <button class="model-btn" data-model="gemini">Gemini</button>
+  <button class="model-btn" data-model="grok">Grok</button>
+  <button class="model-btn" data-model="perplexity">Perplexity</button>
+  <button class="model-btn" data-model="local">Local</button>
+</div>
+
+<div id="chat">
+  <div class="empty-state" id="empty-state">
+    <div class="kitt-emblem">KITT</div>
+    <div class="kitt-tagline">
+      KNIGHT INDUSTRIES TWO THOUSAND<br>
+      SOVEREIGN AI GATEWAY — ONLINE<br>
+      SELECT SYSTEMS · ENTER QUERY · TRANSMIT
+    </div>
+  </div>
+</div>
+
+<div class="input-bar">
+  <div class="input-wrapper">
+    <div class="input-label">▸ DRIVER INPUT TERMINAL</div>
+    <textarea id="prompt-input" placeholder="Speak your command, Michael..." rows="1"></textarea>
+  </div>
+  <button id="send-btn">TRANSMIT</button>
+</div>
+
+<script>
+  const MODEL_LABELS = {
+    claude:     'CLAUDE — ANTHROPIC',
+    openai:     'CHATGPT — OPENAI',
+    gemini:     'GEMINI — GOOGLE',
+    grok:       'GROK — XAI',
+    perplexity: 'PERPLEXITY AI',
+    local:      'LOCAL — OLLAMA',
+  };
+
+  let selectedModels = null;
+
+  async function checkHealth() {
+    try {
+      const r = await fetch('/health');
+      if (r.ok) {
+        document.getElementById('status-dot').className = 'status-led online';
+        document.getElementById('status-text').textContent = 'ALL SYSTEMS NOMINAL';
+      } else throw new Error();
+    } catch {
+      document.getElementById('status-dot').className = 'status-led error';
+      document.getElementById('status-text').textContent = 'SYSTEM OFFLINE';
+    }
+  }
+  checkHealth();
+
+  document.querySelectorAll('.model-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedModels = btn.dataset.model === 'all' ? null : [btn.dataset.model];
+    });
+  });
+
+  const input = document.getElementById('prompt-input');
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  document.getElementById('send-btn').addEventListener('click', send);
+
+  async function send() {
+    const prompt = input.value.trim();
+    if (!prompt) return;
+
+    const chat = document.getElementById('chat');
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.remove();
+
+    const userMsg = document.createElement('div');
+    userMsg.className = 'msg-user';
+    userMsg.textContent = prompt;
+    chat.appendChild(userMsg);
+
+    const thinking = document.createElement('div');
+    thinking.className = 'thinking';
+    thinking.innerHTML = `<div class="mini-scanner"></div><span>ROUTING TO AI SYSTEMS...</span>`;
+    chat.appendChild(thinking);
+
+    chat.scrollTop = chat.scrollHeight;
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('send-btn').disabled = true;
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, models: selectedModels })
+      });
+      const data = await res.json();
+      thinking.remove();
+
+      const group = document.createElement('div');
+      group.className = 'response-group';
+
+      for (const [model, response] of Object.entries(data.responses)) {
+        const card = document.createElement('div');
+        card.className = 'response-card';
+        card.dataset.model = model;
+
+        const isError = response.startsWith('[') && response.includes('Error');
+        const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+
+        card.innerHTML = `
+          <div class="response-header">
+            <span class="model-tag ${model}">${MODEL_LABELS[model] || model.toUpperCase()}</span>
+            <span class="response-ts">${ts}</span>
+          </div>
+          <div class="response-body${isError ? ' error' : ''}">${escapeHtml(response)}</div>
+        `;
+        group.appendChild(card);
+      }
+
+      chat.appendChild(group);
+    } catch (err) {
+      thinking.remove();
+      const errCard = document.createElement('div');
+      errCard.className = 'response-card';
+      errCard.innerHTML = `
+        <div class="response-header">
+          <span class="model-tag" style="color:var(--red);text-shadow:0 0 8px var(--red);font-family:'Orbitron',monospace;font-size:0.52rem;letter-spacing:0.2em;">SYSTEM ERROR</span>
+        </div>
+        <div class="response-body error">${escapeHtml(err.message)}</div>
+      `;
+      chat.appendChild(errCard);
+    }
+
+    chat.scrollTop = chat.scrollHeight;
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
