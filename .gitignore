@@ -14,6 +14,7 @@ spire/socket/
 # Environment Variables & Secrets
 .env
 .env.*
+!.env.example
 security/secrets/
 # Just in case you have secrets in the old path
 secrets/

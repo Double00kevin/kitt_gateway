@@ -1,0 +1,17 @@
+[Unit]
+Description=KITT Hub — Sovereign AI Gateway
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=doubl
+WorkingDirectory=/home/doubl/kitt_gateway/hub
+ExecStart=/home/doubl/kitt_gateway/hub/venv/bin/python3 main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
