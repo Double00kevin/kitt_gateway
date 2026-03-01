@@ -41,6 +41,45 @@ class AgentZero:
         except:
             return "Telemetry Error: Blind."
 
+    def system_health_check(self) -> dict:
+        status = {"timestamp": datetime.now().isoformat()}
+
+        try:
+            uptime = subprocess.check_output("uptime", shell=True).decode().strip()
+            docker_count = int(subprocess.check_output("docker ps -q | wc -l", shell=True).decode().strip())
+            status["uptime"] = uptime
+            status["containers_running"] = docker_count
+        except Exception:
+            status["uptime"] = "unavailable"
+            status["containers_running"] = -1
+
+        try:
+            r = requests.get(f"{MCP_URL}/health", timeout=2)
+            status["mcp"] = "ok" if r.status_code == 200 else "degraded"
+        except Exception:
+            status["mcp"] = "down"
+
+        try:
+            r = requests.get("http://localhost:11434/api/tags", timeout=2)
+            status["ollama"] = "ok" if r.status_code == 200 else "degraded"
+        except Exception:
+            status["ollama"] = "down"
+
+        status["overall"] = "ok" if all(
+            status.get(k) == "ok" for k in ["mcp", "ollama"]
+        ) else "degraded"
+        return status
+
+    def write_system_status(self, status: dict):
+        try:
+            requests.post(
+                f"{MCP_URL}/context/store",
+                json={"agent_id": "kitt_status", "content": json.dumps(status)},
+                timeout=3
+            )
+        except Exception as e:
+            self.log_to_journal(f"MCP status write failed: {e}")
+
     def log_to_journal(self, message):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
         sys.stdout.flush()
@@ -225,15 +264,16 @@ class AgentZero:
         return messages
 
     # ------------------------------------------------------------------ #
-    # DAEMON (unchanged behavior)
+    # DAEMON
     # ------------------------------------------------------------------ #
 
     def run_daemon(self):
-        self.log_to_journal("--- AGENT ZERO DAEMON STARTED ---")
+        self.log_to_journal("--- KITT AGENT ZERO DAEMON STARTED ---")
         while True:
             try:
-                telemetry = self.get_real_telemetry()
-                self.log_to_journal(f"HEARTBEAT: {telemetry}")
+                status = self.system_health_check()
+                self.log_to_journal(f"STATUS: {json.dumps(status)}")
+                self.write_system_status(status)
                 time.sleep(HEARTBEAT_INTERVAL)
             except KeyboardInterrupt:
                 self.log_to_journal("Stopping via Signal.")
