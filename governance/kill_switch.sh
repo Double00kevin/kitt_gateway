@@ -11,6 +11,6 @@ echo "Stopping KITT Hub (chat UI / model router)..."
 sudo systemctl stop kitt-hub
 
 echo "Stopping Agent Zero (autonomous daemon)..."
-sudo systemctl stop agent-zero
+sudo systemctl stop kitt-agent
 
 echo "[LOCKED] Autonomous operations have been successfully terminated. Memory and Identity layers remain intact."
