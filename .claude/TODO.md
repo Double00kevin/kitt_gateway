@@ -121,10 +121,9 @@ Replaced with full `pip freeze` output from the working `hub/venv/` (18 packages
 
 ---
 
-### M4 — `SYSTEM_BREAKDOWN.md` predates the Hub and fan_out()
-**File:** `SYSTEM_BREAKDOWN.md`
+### ~~M4 — `SYSTEM_BREAKDOWN.md` predates the Hub and fan_out()~~ ✅ FIXED 2026-03-01
 
-This file was generated before `hub/`, the external API routing, and the MCP docker-compose were in place. Several sections are now inaccurate: the architecture diagram, port map, script purpose table, and data flow diagrams do not include the Hub or the five external AI providers.
+Full rewrite: architecture diagram, directory structure, file purpose tables, env vars table, all five data flow diagrams, port map, and Docker service registry updated to reflect Hub, fan_out(), MCP docker-compose, external API routing, kitt-agent rename, and current running state.
 
 ---
 
