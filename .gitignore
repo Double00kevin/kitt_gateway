@@ -3,6 +3,9 @@
 .vscode/
 .idea/
 
+# Claude Code local settings (machine-specific, not for repo)
+.claude/settings.local.json
+
 # Identity Layer & Cryptography (CRITICAL)
 spire/data/
 spire/socket/
