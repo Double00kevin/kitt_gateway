@@ -4,7 +4,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../a
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+import requests
 from pydantic import BaseModel
 from typing import Optional, List
 from agent import AgentZero
@@ -31,7 +32,23 @@ def index():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "kitt-hub"}
+    checks = {}
+
+    try:
+        r = requests.get("http://localhost:8000/health", timeout=2)
+        checks["mcp"] = "ok" if r.status_code == 200 else "degraded"
+    except Exception:
+        checks["mcp"] = "down"
+
+    try:
+        r = requests.get("http://localhost:11434/api/tags", timeout=2)
+        checks["ollama"] = "ok" if r.status_code == 200 else "degraded"
+    except Exception:
+        checks["ollama"] = "down"
+
+    overall = "ok" if all(v == "ok" for v in checks.values()) else "degraded"
+    code = 200 if overall == "ok" else 503
+    return JSONResponse(status_code=code, content={"status": overall, "service": "kitt-hub", "checks": checks})
 
 @app.post("/chat")
 def chat(request: ChatRequest):

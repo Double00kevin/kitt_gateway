@@ -35,7 +35,7 @@ def process_node(state: AgentState):
     logging.info(json.dumps({"action": "inference_complete", "status": "success"}))
     
     # 3. Write updated state
-    new_state = "Phase 6 ATS Telemetry Active. KITT Gateway Fully Operational."
+    new_state = response.content
     scs.set("mission_status", new_state)
     logging.info(json.dumps({"action": "memory_write", "target": "redis_scs", "key": "mission_status"}))
     

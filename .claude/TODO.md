@@ -1,6 +1,6 @@
 # KITT Sovereign Gateway — TODO
 
-**Last updated:** 2026-02-28
+**Last updated:** 2026-03-01
 
 Issues are grouped by category. Bugs are things currently broken or that will break under predictable conditions. Incomplete components are things that are declared/stubbed but not implemented. Priorities are ordered within each section.
 
@@ -28,19 +28,15 @@ Replaced sequential for-loop with `ThreadPoolExecutor(max_workers=len(valid_mode
 
 ---
 
-### B4 — `orchestrator/router.py` always writes a hardcoded static string to Redis
-**File:** `orchestrator/router.py:38`
+### ~~B4 — `orchestrator/router.py` always writes a hardcoded static string to Redis~~ ✅ FIXED 2026-03-01
 
-After invoking the LLM, the orchestrator writes `new_state = "Phase 6 ATS Telemetry Active. KITT Gateway Fully Operational."` back to `mission_status` — every time, unconditionally. The actual LLM response (`response.content`) is returned from the node but never informs the state update. The blackboard value is therefore always the same string regardless of what the model said.
+`new_state` changed from the hardcoded string to `response.content` so the actual LLM output is written to the `mission_status` blackboard key.
 
 ---
 
-### B5 — SPIFFE trust domain mismatch across agent cards
-**Files:** `a2a_proxy/html/.well-known/agent-card.json:3`, `a2a/agent_zero/agent-card.json:7`
+### ~~B5 — SPIFFE trust domain mismatch across agent cards~~ ✅ FIXED 2026-03-01
 
-The public-facing agent card declares `spiffe://mpx.sovereign/kitt_node/edge_router` (trust domain: `mpx.sovereign`). Agent Zero's card declares `spiffe://kitt.local/agent_zero` (trust domain: `kitt.local`). These are two different trust domains. The SPIRE server is configured for `mpx.sovereign` only — `kitt.local` SVIDs cannot be issued by it.
-
-**Fix:** Align all SPIFFE IDs to `spiffe://mpx.sovereign/...` and update the agent-card accordingly.
+`a2a/agent_zero/agent-card.json` updated: `spiffe://kitt.local/agent_zero` → `spiffe://mpx.sovereign/agent_zero`. Both agent cards now declare the `mpx.sovereign` trust domain.
 
 ---
 
@@ -90,10 +86,9 @@ The public agent card advertises `pii_masking`, `intent_classification`, and `lo
 
 ---
 
-### I6 — Hub `/health` endpoint does not validate external connectivity
-**File:** `hub/main.py:32-34`
+### ~~I6 — Hub `/health` endpoint does not validate external connectivity~~ ✅ FIXED 2026-03-01
 
-`GET /health` returns `{"status": "ok"}` as long as the FastAPI process is running. It does not check whether API keys are set, whether the MCP Server is reachable, or whether Ollama is up. The status LED in the UI will show green even if every downstream dependency is broken.
+`GET /health` now checks MCP Server (`:8000`) and Ollama (`:11434`) with a 2-second timeout each. Returns `{"status":"ok"}` with HTTP 200 when all dependencies are up; `{"status":"degraded"}` with HTTP 503 and per-service detail when any dependency is down.
 
 ---
 
