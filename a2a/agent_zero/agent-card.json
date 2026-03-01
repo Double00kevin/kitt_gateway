@@ -4,7 +4,7 @@
   "identity": {
     "name": "KITT Agent Zero",
     "role": "Primary Autonomous Actor",
-    "spiffe_id": "spiffe://kitt.local/agent_zero"
+    "spiffe_id": "spiffe://mpx.sovereign/agent_zero"
   },
   "capabilities": [
     {
