@@ -14,7 +14,7 @@ KITT Gateway is a **local-first, sovereign AI infrastructure** designed to run a
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        HOST MACHINE (Linux)                         │
 │                                                                     │
-│  [systemd: agent-zero.service]          [UFW Firewall]              │
+│  [systemd: kitt-agent.service]           [UFW Firewall]              │
 │        │                                  Port 22 (LAN only)       │
 │        │                                  Port 9000 (public)        │
 │        ▼                                                            │
@@ -112,7 +112,7 @@ kitt_gateway/
 | File | Purpose |
 |------|---------|
 | `a2a/agent_zero/agent.py` | **Agent Zero Daemon** — Primary autonomous actor. Runs an infinite loop that: (1) gathers real telemetry (`uptime`, active Docker container count via `docker ps`), (2) logs a heartbeat with that telemetry, (3) sleeps 60 seconds. Connects to Ollama `:11434` and MCP Server `:8000` (configured but not actively called in current implementation). |
-| `a2a/agent_zero/agent-zero.service` | Systemd unit file. Runs `agent.py` under user `doubl` with `Restart=always`. Starts after `network.target` and `docker.service`. Logs to systemd journal. |
+| `a2a/agent_zero/kitt-agent.service` | Systemd unit file. Runs `agent.py` under user `doubl` with `Restart=always`. Starts after `network.target` and `docker.service`. Logs to systemd journal. |
 | `a2a/agent_zero/agent-card.json` | Agent identity descriptor (A2A protocol format). Declares Agent Zero's `agent_id`, role ("Primary Autonomous Actor"), SPIFFE ID, capabilities (`mcp_memory`, `inference_edge`), and security requirements (`intent_gate_required: true`, PQC standard ML-KEM-768). |
 | `a2a/agent_zero/requirements.txt` | Agent Zero Python dependencies: `certifi`, `charset-normalizer`, `idna`, `python-dotenv`, `requests`, `urllib3`. |
 | `a2a/registry/gateway-manifest.json` | Gateway-level capability manifest. Lists the gateway's capabilities (SPIRE identity, Redis/MCP context storage, inference routing), service ports (9000 RPC, 8000 context), and the registry of active agents. |
@@ -176,7 +176,7 @@ These values are embedded directly in source files. A `.env` file is git-ignored
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | `orchestrator/router.py:21` | Ollama URL for LangChain ChatOllama |
 | `OLLAMA_MODEL` | `llama3.2` | `orchestrator/router.py:21` | Model for orchestrator |
 | `ATS_LOG_FILE` | `~/kitt_gateway/governance/telemetry/ats_audit.log` | `orchestrator/router.py:11` | Audit log path |
-| `PYTHONUNBUFFERED` | `1` | `a2a/agent_zero/agent-zero.service:14` | Force unbuffered stdout for systemd journal |
+| `PYTHONUNBUFFERED` | `1` | `a2a/agent_zero/kitt-agent.service:14` | Force unbuffered stdout for systemd journal |
 
 ### SPIRE Configuration
 
@@ -215,7 +215,7 @@ These values are embedded directly in source files. A `.env` file is git-ignored
 ### Data Flow: Agent Zero Heartbeat Loop
 
 ```
-agent-zero.service (systemd)
+kitt-agent.service (systemd)
     │
     └──▶ agent.py::run_daemon()
               │

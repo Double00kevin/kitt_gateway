@@ -30,9 +30,9 @@ cd a2a_proxy && docker compose up -d
 docker compose up -d   # from repo root
 
 # 7. Agent Zero (systemd daemon, not Docker)
-sudo systemctl start agent-zero
-sudo systemctl status agent-zero
-sudo journalctl -fu agent-zero   # follow logs
+sudo systemctl start kitt-agent
+sudo systemctl status kitt-agent
+sudo journalctl -fu kitt-agent   # follow logs
 
 # 8. KITT Hub (systemd daemon, not Docker)
 sudo systemctl start kitt-hub
@@ -141,7 +141,7 @@ Default fan_out (when `models=None`) sends to all five external APIs; `"local"` 
 | SPIRE Server + Agent | Docker (`spire-server`, `spire-agent`) |
 | Gateway Sandbox | Docker (`kitt_sandbox`) |
 | MCP Server | Docker (`mpx-mcp-server`, via `mcp/docker-compose.yml`) |
-| Agent Zero daemon | systemd on host (`agent-zero.service`) |
+| Agent Zero daemon | systemd on host (`kitt-agent.service`) |
 | KITT Hub | systemd on host (`kitt-hub.service`) |
 | Orchestrator / router | Python venv on host (`.venv` in `orchestrator/`) |
 
