@@ -79,10 +79,9 @@ The public agent card advertises `pii_masking`, `intent_classification`, and `lo
 
 ---
 
-### I5 — Agent Zero daemon loop is disconnected from model routing
-**File:** `a2a/agent_zero/agent.py:209-222`
+### ~~I5 — Agent Zero daemon loop is disconnected from model routing~~ ✅ FIXED 2026-03-01
 
-`run_daemon()` only polls telemetry and logs heartbeats. It does not call `fan_out()`, read from MCP, or take any autonomous action. The daemon is alive but passive. Agent Zero's routing capability is only exercised when the Hub explicitly calls `fan_out()` in response to a user request.
+`run_daemon()` now calls `system_health_check()` on every tick: probes MCP (:8000) and Ollama (:11434), captures uptime and container count, and writes a structured JSON status report to MCP under `agent_id="kitt_status"`. Results are also logged to the systemd journal. Readable via `curl http://localhost:8000/context/retrieve?agent_id=kitt_status`.
 
 ---
 
