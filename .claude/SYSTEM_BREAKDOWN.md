@@ -83,6 +83,7 @@ kitt_gateway/
 ├── a2a_proxy/                   # A2A discovery proxy (nginx)
 │   └── html/.well-known/        # Public agent-card endpoint
 ├── config/                      # Read-only kernel/config markers
+│   └── kernel_tripwire.txt      # Empty sentinel file; not used by any running process
 ├── docs/
 │   └── intelligence_archive/    # Audit logs and master index
 ├── governance/
@@ -123,15 +124,16 @@ kitt_gateway/
 | File | Purpose |
 |------|---------|
 | `hub/main.py` | **KITT Hub** — FastAPI app (port 8080). Serves the chat UI and exposes two endpoints: `POST /chat {prompt, models}` fans out to selected models via Agent Zero's `fan_out()`; `GET /health` probes MCP (:8000) and Ollama (:11434) with 2s timeouts, returns `{"status":"ok"\|"degraded","checks":{...}}` with HTTP 200/503. Imports `AgentZero` directly via `sys.path` injection. |
-| `hub/kitt-hub.service` | systemd unit for the Hub. Runs `uvicorn hub/main.py` under user `doubl`, `Restart=always`. Starts after `network.target`. |
+| `hub/kitt-hub.service` | systemd unit for the Hub. ExecStart: `python3 main.py` under user `doubl` (main.py invokes uvicorn internally in its `__main__` block). `Restart=always`. Declares `After=network.target docker.service`, `Wants=docker.service`. |
 | `hub/requirements.txt` | Pinned Hub dependencies (18 packages): fastapi, uvicorn, requests, python-dotenv, and transitive deps. |
-| `hub/static/` | Frontend assets served at `/static`. Contains `index.html` with the chat UI. |
+| `hub/static/` | Frontend assets served at `/static`. Contains `index.html` only — a self-contained single-file chat UI (HTML/CSS/JS inline). No separate JS or CSS files. |
 
 ### Agent Zero
 
 | File | Purpose |
 |------|---------|
-| `a2a/agent_zero/agent.py` | **Agent Zero** — Core routing engine and autonomous daemon. `fan_out(prompt, models)` dispatches to up to 6 model backends in parallel via `ThreadPoolExecutor`, stores prompt + responses in MCP memory, and returns `{model: response}` dict. `run_daemon()` loops every 60s: runs `system_health_check()` (probes MCP + Ollama, captures uptime/container count), logs structured JSON status to systemd journal, and writes a health report to MCP under `agent_id="kitt_status"`. |
+| `a2a/agent_zero/agent.py` | **Agent Zero** — Core routing engine and autonomous daemon. `fan_out(prompt, models)` dispatches to up to 6 model backends in parallel via `ThreadPoolExecutor`, stores prompt + responses in MCP memory, and returns `{model: response}` dict. Default model list when `None` is passed: `["claude","openai","gemini","grok","perplexity"]` — `"local"` is not in the default and must be explicitly requested. `run_daemon()` loops every 60s: runs `system_health_check()` (probes MCP + Ollama, captures uptime/container count), logs structured JSON status to systemd journal, and writes a health report to MCP under `agent_id="kitt_status"`. `_history_to_messages()` caps context at `history[-6:]` for all models except Gemini. `call_gemini()` uses its own history slice of `[-4:]` and filters out response parts where `"thought": true` to strip gemini-2.5-flash extended thinking traces. |
+| `a2a/agent_zero/requirements.txt` | Pinned Agent Zero dependencies (6 packages): requests, python-dotenv, and transitive deps. |
 | `a2a/agent_zero/kitt-agent.service` | systemd unit for the Agent Zero daemon (`kitt-agent.service`). Runs `agent.py` under user `doubl`, `Restart=always`. |
 | `a2a/agent_zero/agent-card.json` | A2A identity descriptor. Declares `agent_id`, SPIFFE ID (`spiffe://mpx.sovereign/agent_zero`), capabilities (`mcp_memory`, `inference_edge`), and security requirements. |
 | `a2a/agent_zero/.env` | API keys for all 5 external providers (git-ignored). Loaded at import time via `load_dotenv()`. |
@@ -144,7 +146,8 @@ kitt_gateway/
 | `docker-compose.yml` | Defines `kitt_sandbox` — Ubuntu 24.04 container with GPU passthrough on `kitt_sovereign_net`. |
 | `mcp/server.py` | **MCP Server** — FastAPI REST shim over Redis (port 8000). `POST /context/store` writes agent context (capped at 5 entries per `agent_id`). `GET /context/retrieve` fetches stored context. `GET /health` returns Redis connection status. |
 | `mcp/docker-compose.yml` | Deploys `mpx-mcp-server` on `kitt_sovereign_net`. Connects to Redis via Docker DNS name `mpx-shared-context`. |
-| `orchestrator/router.py` | **LangGraph Orchestrator** — One-shot stateful workflow. Reads `mission_status` from Redis, invokes llama3.2 via `ChatOllama`, writes actual LLM response back to Redis. Logs events to ATS audit log. Run manually; not integrated into Hub request path. |
+| `mcp/requirements.txt` | **Unpinned** MCP dependencies: `fastapi`, `uvicorn`, `redis` (no version pins). Unlike `hub/requirements.txt`, these are not frozen — pin before production. |
+| `orchestrator/router.py` | **LangGraph Orchestrator** — One-shot stateful workflow. `AgentState` TypedDict: `messages: Annotated[list[str], operator.add]`. Single node "router" (`process_node`). Reads `mission_status` from Redis, invokes `ChatOllama(model="llama3.2")` (model string is `"llama3.2"`, not `"llama3.2:latest"`), writes actual LLM response back to Redis. Logs 4 event types to ATS audit log. Run manually; not integrated into Hub request path. |
 | `shared_context/docker-compose.yaml` | Runs `redis:alpine` as `mpx-shared-context` on `127.0.0.1:6379`, joined to `kitt_sovereign_net`. Persists data via `--save 60 1`. |
 | `inference/docker-compose.yaml` | Runs `ollama/ollama:latest` as `mpx-inference-edge` on `127.0.0.1:11434` with 1 NVIDIA GPU reserved. |
 
@@ -195,15 +198,15 @@ kitt_gateway/
 
 | Constant | Value | Location |
 |----------|-------|----------|
-| `OLLAMA_URL` | `http://localhost:11434/api/generate` | `agent.py:13` |
-| `MCP_URL` | `http://localhost:8000` | `agent.py:14` |
-| `MODEL` | `llama3.2:latest` | `agent.py:15` |
-| `AGENT_ID` | `agent_zero` | `agent.py:16` |
-| `HEARTBEAT_INTERVAL` | `60` (seconds) | `agent.py:17` |
+| `OLLAMA_URL` | `http://localhost:11434/api/generate` | `agent.py:14` |
+| `MCP_URL` | `http://localhost:8000` | `agent.py:15` |
+| `MODEL` | `llama3.2:latest` | `agent.py:16` |
+| `AGENT_ID` | `agent_zero` | `agent.py:17` |
+| `HEARTBEAT_INTERVAL` | `60` (seconds) | `agent.py:18` |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | `orchestrator/router.py:21` |
-| `SPIRE_SOCKET` | `/run/spire/sockets/agent.sock` | `mcp/server.py:9` (reserved) |
+| `SPIRE_SOCKET` | `/run/spire/sockets/agent.sock` | `mcp/server.py:10` (reserved, future use) |
 | `ATS_LOG_FILE` | `~/kitt_gateway/governance/telemetry/ats_audit.log` | `orchestrator/router.py:11` |
-| `PYTHONUNBUFFERED` | `1` | `kitt-agent.service`, `kitt-hub.service` |
+| `PYTHONUNBUFFERED` | `1` | `kitt-agent.service` only (not set in `kitt-hub.service`) |
 
 ### SPIRE Configuration
 

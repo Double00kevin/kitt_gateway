@@ -7,7 +7,8 @@ Guidance for Claude Code working in this repository.
 Full technical detail lives in these files — do not duplicate content here:
 
 - **`PROJECT_CONTEXT.md`** — project identity, repo layout, how to use this context
-- **`docs/`** — architecture, component details, audit logs
+- **`.claude/SYSTEM_BREAKDOWN.md`** — canonical architecture reference: directory structure, file purposes, env vars, data flows, port map
+- **`docs/intelligence_archive/`** — historical audit logs only
 - **`~/builder-os/01-projects/kitt_gateway/`** — STATUS.md, NEXT.md, LINKS.md (operator control plane)
 
 ## Quick Commands
@@ -52,7 +53,7 @@ bash governance/kill_switch.sh   # stops inference + A2A proxy; Redis + SPIRE st
 
 ## Key Constraints
 
-- Three separate Python venvs — do not mix: `orchestrator/.venv/`, `a2a/agent_zero/venv/`, `hub/venv/`
+- Four separate Python venvs — do not mix: `orchestrator/.venv/`, `a2a/agent_zero/venv/`, `hub/venv/`, `mcp/venv/`
 - API keys in `a2a/agent_zero/.env` (git-ignored); Hub inherits them via `sys.path` import
 - Agent Zero and Hub are systemd daemons on the host, not Docker containers
 
