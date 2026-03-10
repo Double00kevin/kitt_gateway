@@ -18,7 +18,7 @@ Issues are grouped by category. Bugs are things currently broken or that will br
 
 ### ~~B2 — Kill switch does not stop the Hub or Agent Zero~~ ✅ FIXED 2026-02-28
 
-Added `sudo systemctl stop kitt-hub` and `sudo systemctl stop agent-zero` to `governance/kill_switch.sh` before the final log line.
+Added `sudo systemctl stop kitt-hub` and `sudo systemctl stop kitt-agent` to `governance/kill_switch.sh` before the final log line.
 
 ---
 
@@ -154,13 +154,11 @@ The capability endpoints listed in Agent Zero's card (`http://localhost:8000`, `
 
 Ordered by impact-to-effort ratio:
 
-1. **Fix hardcoded Docker IPs (B1)** — high breakage risk, one-line fix per location
-2. **Commit `kitt-hub.service` to repo (M1)** — low effort, prevents disaster on rebuild
-3. **Add `.env.example` (M2)** — two minutes of work, saves future headaches
-4. **Fix kill switch to cover all services (B2)** — two extra lines; governance correctness
-5. **Parallelize `fan_out()` (B3)** — significant UX improvement; ~30 lines with `ThreadPoolExecutor`
-6. **Pin `hub/requirements.txt` (M3)** — run one command
-7. **Fix SPIFFE trust domain alignment (B5)** — correctness before SPIRE is relied upon
-8. **Fix `orchestrator/router.py` static state write (B4)** — if the orchestrator is used
-9. **Implement intent gate (I2)** — use local Llama 3.2 as a pre-screen before external dispatch
-10. **Wire SPIRE workload attestation (I1)** — prerequisite for zero-trust enforcement
+1. **Resolve B6** — delete or wire `shared_context/ledger.json` (no code reads/writes it)
+2. **Implement intent gate (I2)** — use local llama3.2 as pre-screen before external dispatch
+3. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
+4. **Finalize SPIRE bootstrap (I7)** — rotate join token, disable `insecure_bootstrap`
+5. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
+6. **Decouple Hub from Agent Zero (A1)** — expose Agent Zero as HTTP service
+7. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
+8. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`

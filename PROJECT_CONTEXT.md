@@ -8,7 +8,8 @@ Gateway/orchestrator environment.
 
 ## Canonical Technical Truth
 All detailed documentation lives here (do not duplicate):
-- docs/
+- `.claude/SYSTEM_BREAKDOWN.md`  ← canonical architectural reference
+- `docs/intelligence_archive/`   ← historical audit logs only
 
 ## Builder-OS Control Plane
 See: ~/builder-os/01-projects/kitt_gateway/
@@ -22,6 +23,6 @@ See: ~/builder-os/01-projects/kitt_gateway/STATUS.md
 
 ## How to Use This File
 - Paste this entire file at the top of any new AI thread working on this project.
-- Keep it thin; real technical details belong in docs/* only.
+- Keep it thin; real technical details belong in `.claude/SYSTEM_BREAKDOWN.md` only.
 
 Last updated: 2026-03-08
