@@ -9,8 +9,6 @@ Full technical detail lives in these files — do not duplicate content here:
 - **`PROJECT_CONTEXT.md`** — project identity, repo layout, how to use this context
 - **`.claude/SYSTEM_BREAKDOWN.md`** — canonical architecture reference: directory structure, file purposes, env vars, data flows, port map
 - **`docs/intelligence_archive/`** — historical audit logs only
-- **`~/builder-os/01-projects/kitt_gateway/`** — STATUS.md, NEXT.md, LINKS.md (operator control plane)
-
 ## Quick Commands
 
 **Start the stack** (bring up in dependency order):
@@ -57,8 +55,3 @@ bash governance/kill_switch.sh   # stops inference + A2A proxy; Redis + SPIRE st
 - API keys in `a2a/agent_zero/.env` (git-ignored); Hub inherits them via `sys.path` import
 - Agent Zero and Hub are systemd daemons on the host, not Docker containers
 
-# Builder-OS Control Plane
-For current status and next actions, also read:
-- ~/builder-os/01-projects/kitt_gateway/STATUS.md
-- ~/builder-os/01-projects/kitt_gateway/NEXT.md
-- Follow all rules in ~/builder-os/OPERATING_MODEL.md
