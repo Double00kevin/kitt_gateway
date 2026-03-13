@@ -21,6 +21,7 @@ spire/socket/
 security/secrets/
 # Just in case you have secrets in the old path
 secrets/
+cookies.txt
 
 # Python & Orchestration (LangGraph / MCP)
 __pycache__/
