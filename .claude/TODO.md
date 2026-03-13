@@ -40,10 +40,9 @@ Replaced sequential for-loop with `ThreadPoolExecutor(max_workers=len(valid_mode
 
 ---
 
-### B6 — `shared_context/ledger.json` is permanently stale
-**File:** `shared_context/ledger.json`
+### ~~B6 — `shared_context/ledger.json` is permanently stale~~ ✅ FIXED 2026-03-13
 
-`ledger.json` shows `"active_agents": []` and `"shared_memory": {}`. Nothing in the codebase writes to this file at runtime. It was created manually and never updated. It does not reflect actual system state.
+File deleted — nothing in the codebase read or wrote to it at runtime.
 
 ---
 
@@ -150,12 +149,20 @@ The capability endpoints listed in Agent Zero's card (`http://localhost:8000`, `
 
 ---
 
+## Known History Contamination
+
+### H1 — `cookies.txt` (Google session cookies) in git history
+**Commit:** `2cec9ea` (2026-03-07)
+
+`cookies.txt` was accidentally committed and pushed to both `origin` (GitHub) and `ssd-vault`. It has since been removed from the index and added to `.gitignore` (commits `0bfbd75`, `3dd692a`), but the file remains in the raw git history on both remotes. The cookies are almost certainly expired. A full purge would require `git filter-repo` + force-push to both remotes — deferred as low practical risk.
+
+---
+
 ## Next Development Priorities
 
 Ordered by impact-to-effort ratio:
 
-1. **Resolve B6** — delete or wire `shared_context/ledger.json` (no code reads/writes it)
-2. **Implement intent gate (I2)** — use local llama3.2 as pre-screen before external dispatch
+1. **Implement intent gate (I2)** — use local llama3.2 as pre-screen before external dispatch
 3. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
 4. **Finalize SPIRE bootstrap (I7)** — rotate join token, disable `insecure_bootstrap`
 5. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
