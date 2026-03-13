@@ -52,8 +52,14 @@ def health():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    results = agent.fan_out(prompt=request.prompt, models=request.models)
-    return {"prompt": request.prompt, "responses": results}
+    result = agent.fan_out(prompt=request.prompt, models=request.models)
+    return {
+        "prompt": request.prompt,
+        "responses": result["responses"],
+        "intent_flagged": result["intent"]["flagged"],
+        "intent_category": result["intent"]["reason"],
+        "intent_score": result["intent"]["score"]
+    }
 
 
 # --- Main ---

@@ -57,10 +57,9 @@ File deleted — nothing in the codebase read or wrote to it at runtime.
 
 ---
 
-### I2 — Intent gate declared but does not exist
-**File:** `a2a/agent_zero/agent-card.json:12`
+### ~~I2 — Intent gate declared but does not exist~~ ✅ FIXED 2026-03-13
 
-`"intent_gate_required": true` is declared in Agent Zero's security policy. There is no intent gate implemented anywhere — no prompt classifier, no allow/deny logic, no pre-call validation before `fan_out()` dispatches to external APIs. Any string sent to `POST /chat` is forwarded verbatim to all selected models.
+`check_intent()` added to `agent.py` — pre-screens every prompt via llama3.2 before `fan_out()` fires. Flag-only (never blocks). Categories: `none`, `prompt_injection`, `jailbreak`, `unsafe`. Flagged events logged to `ats_audit.log` (prompt hash only, not plaintext), MCP `kitt_status` namespace, and systemd journal. `hub/main.py` returns `intent_flagged`, `intent_category`, `intent_score` in every `/chat` response.
 
 ---
 
@@ -162,10 +161,9 @@ The capability endpoints listed in Agent Zero's card (`http://localhost:8000`, `
 
 Ordered by impact-to-effort ratio:
 
-1. **Implement intent gate (I2)** — use local llama3.2 as pre-screen before external dispatch
-3. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
-4. **Finalize SPIRE bootstrap (I7)** — rotate join token, disable `insecure_bootstrap`
-5. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
-6. **Decouple Hub from Agent Zero (A1)** — expose Agent Zero as HTTP service
-7. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
-8. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`
+1. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
+2. **Finalize SPIRE bootstrap (I7)** — rotate join token, disable `insecure_bootstrap`
+3. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
+4. **Decouple Hub from Agent Zero (A1)** — expose Agent Zero as HTTP service
+5. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
+6. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`
