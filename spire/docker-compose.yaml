@@ -15,6 +15,7 @@ services:
       - ./agent:/run/spire/config:ro
       - ./data/agent:/run/spire/data:rw
       - /home/doubl/kitt_gateway/spire/sockets:/run/spire/sockets:rw
+      - ./bootstrap.crt:/run/spire/bootstrap.crt:ro
     command: ["-config", "/run/spire/config/agent.conf"]
     network_mode: host
     depends_on:
