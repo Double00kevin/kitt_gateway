@@ -1,6 +1,6 @@
 # KITT Sovereign Gateway — TODO
 
-**Last updated:** 2026-03-01
+**Last updated:** 2026-03-13
 
 Issues are grouped by category. Bugs are things currently broken or that will break under predictable conditions. Incomplete components are things that are declared/stubbed but not implemented. Priorities are ordered within each section.
 
@@ -89,10 +89,9 @@ The public agent card advertises `pii_masking`, `intent_classification`, and `lo
 
 ---
 
-### I7 — SPIRE bootstrap not finalized
-**File:** `spire/agent/agent.conf:8-9`
+### ~~I7 — SPIRE bootstrap not finalized~~ ✅ FIXED 2026-03-13
 
-`insecure_bootstrap: true` was set for initial setup and the join token (`REDACTED_SPIRE_TOKEN_1`) is plaintext in the config. After initial agent attestation the trust bundle should be pinned, `insecure_bootstrap` disabled, and the token rotated or replaced with a more durable attestation method (e.g., x509pop or TPM).
+Stale CA certs (expired 2026-03-01) wiped from `spire/data/`. Fresh CA generated on server restart. New join token (`fc0aa621-...`) registered and consumed during re-attestation. `insecure_bootstrap` set to `false`; server trust bundle exported to `spire/agent/bootstrap.crt` (mounted read-only into agent container at `/run/spire/config/bootstrap.crt`) and referenced via `trust_bundle_path`. Agent now verifies server TLS against pinned bundle on every connection. Token in config is single-use (already consumed) — retained as emergency re-attestation credential; generate fresh via `docker exec spire-server /opt/spire/bin/spire-server token generate -spiffeID spiffe://mpx.sovereign/spire-agent -ttl 3600` if data dir is ever wiped.
 
 ---
 
@@ -127,17 +126,9 @@ Full rewrite: architecture diagram, directory structure, file purpose tables, en
 
 ## Architecture / Coupling
 
-### A1 — Hub imports Agent Zero via `sys.path` injection
-**File:** `hub/main.py:1-3`
+### ~~A1 — Hub imports Agent Zero via `sys.path` injection~~ ✅ FIXED 2026-03-13
 
-```python
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../a2a/agent_zero')))
-from agent import AgentZero
-```
-
-This works but ties the Hub tightly to the Agent Zero filesystem path and venv. If `agent.py` gains a new import not present in `hub/venv/`, the Hub crashes at startup with no clear error. If the directory is moved, the Hub breaks.
-
-**Better long-term approach:** Expose Agent Zero as a local HTTP service (it already has MCP_URL and Ollama wired) and have the Hub call it over HTTP, or package `agent.py` as a proper installable module.
+Agent Zero now runs as a standalone FastAPI HTTP service on loopback `:9001` (`python agent.py serve`), managed by `kitt-agent-http.service`. Hub calls `POST http://127.0.0.1:9001/fan_out` via `requests`; the `sys.path.insert` hack is gone. A `USE_DIRECT_AGENT_ZERO=true` env toggle re-enables the old direct-import path if needed. Hub returns HTTP 503 `{"error":"Agent Zero unavailable"}` if the service is down.
 
 ---
 
@@ -162,8 +153,8 @@ The capability endpoints listed in Agent Zero's card (`http://localhost:8000`, `
 Ordered by impact-to-effort ratio:
 
 1. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
-2. **Finalize SPIRE bootstrap (I7)** — rotate join token, disable `insecure_bootstrap`
+2. ~~**Finalize SPIRE bootstrap (I7)**~~ ✅ DONE
 3. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
-4. **Decouple Hub from Agent Zero (A1)** — expose Agent Zero as HTTP service
+4. ~~**Decouple Hub from Agent Zero (A1)**~~ ✅ DONE
 5. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
 6. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`

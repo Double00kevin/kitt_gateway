@@ -1,6 +1,5 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../a2a/agent_zero')))
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -8,10 +7,16 @@ from fastapi.responses import FileResponse, JSONResponse
 import requests
 from pydantic import BaseModel
 from typing import Optional, List
-from agent import AgentZero
 
 app = FastAPI(title="KITT Hub")
-agent = AgentZero()
+
+AGENT_URL = "http://127.0.0.1:9001"
+USE_DIRECT = os.getenv("USE_DIRECT_AGENT_ZERO", "false").lower() == "true"
+
+if USE_DIRECT:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../a2a/agent_zero')))
+    from agent import AgentZero
+    _direct_agent = AgentZero()
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -52,13 +57,26 @@ def health():
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    result = agent.fan_out(prompt=request.prompt, models=request.models)
+    if USE_DIRECT:
+        result = _direct_agent.fan_out(prompt=request.prompt, models=request.models)
+    else:
+        try:
+            r = requests.post(
+                f"{AGENT_URL}/fan_out",
+                json={"prompt": request.prompt, "models": request.models},
+                timeout=120
+            )
+            r.raise_for_status()
+            result = r.json()
+        except requests.RequestException:
+            return JSONResponse(status_code=503, content={"error": "Agent Zero unavailable"})
+
     return {
         "prompt": request.prompt,
         "responses": result["responses"],
         "intent_flagged": result["intent"]["flagged"],
         "intent_category": result["intent"]["reason"],
-        "intent_score": result["intent"]["score"]
+        "intent_score":    result["intent"]["score"],
     }
 
 

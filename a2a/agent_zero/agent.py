@@ -361,6 +361,31 @@ class AgentZero:
                 time.sleep(5)
 
 
+# ------------------------------------------------------------------ #
+# HTTP SERVICE MODE
+# ------------------------------------------------------------------ #
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import Optional, List
+import uvicorn
+
+api = FastAPI(title="KITT Agent Zero")
+_agent_instance = AgentZero()
+
+
+class FanOutRequest(BaseModel):
+    prompt: str
+    models: Optional[List[str]] = None
+
+
+@api.post("/fan_out")
+def fan_out_endpoint(req: FanOutRequest):
+    return _agent_instance.fan_out(prompt=req.prompt, models=req.models)
+
+
 if __name__ == "__main__":
-    agent = AgentZero()
-    agent.run_daemon()
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        uvicorn.run(api, host="127.0.0.1", port=9001)
+    else:
+        AgentZero().run_daemon()

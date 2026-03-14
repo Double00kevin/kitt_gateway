@@ -1,6 +1,6 @@
 # KITT Sovereign Gateway — System Breakdown
 
-**Updated:** 2026-03-01
+**Updated:** 2026-03-13
 **Architecture Codename:** MadProjx-v1
 **Gateway ID:** KITT-Sovereign-Gateway v1.1.0
 
@@ -15,13 +15,14 @@ KITT Gateway is a **local-first, sovereign AI infrastructure** that fans out pro
 │                          HOST MACHINE (Linux)                           │
 │                                                                         │
 │  [systemd: kitt-hub.service :8080]   [systemd: kitt-agent.service]      │
-│        │                                     │                          │
+│        │                           [systemd: kitt-agent-http.service]   │
 │        │  Browser / LAN client               │  60s health tick         │
 │        ▼                                     ▼                          │
-│  ┌──────────────┐    fan_out()    ┌──────────────────┐                  │
-│  │   KITT Hub   │────────────────▶│   Agent Zero     │                  │
-│  │  FastAPI     │                 │   (daemon)       │                  │
-│  │  :8080       │                 └────────┬─────────┘                  │
+│  ┌──────────────┐  POST /fan_out  ┌──────────────────┐                  │
+│  │   KITT Hub   │────HTTP:9001───▶│   Agent Zero     │                  │
+│  │  FastAPI     │   (loopback)    │  FastAPI :9001   │                  │
+│  │  :8080       │                 │  + daemon mode   │                  │
+│  └──────────────┘                 └────────┬─────────┘                  │
 │  └──────────────┘                          │                            │
 │                                            │ POST /context/store        │
 │  External APIs (via Agent Zero):           ▼                            │
@@ -74,9 +75,10 @@ kitt_gateway/
 │   ├── SYSTEM_BREAKDOWN.md      # This file
 │   └── TODO.md                  # Open bugs and incomplete components
 ├── a2a/
-│   ├── agent_zero/              # Agent Zero: source, venv, systemd unit, identity card
-│   │   ├── agent.py             # Primary daemon + fan_out() routing engine
-│   │   ├── kitt-agent.service   # systemd unit (installed as kitt-agent.service)
+│   ├── agent_zero/              # Agent Zero: source, venv, systemd units, identity card
+│   │   ├── agent.py             # Daemon + fan_out() engine + FastAPI HTTP service (:9001)
+│   │   ├── kitt-agent.service   # systemd unit — daemon mode (no args)
+│   │   ├── kitt-agent-http.service # systemd unit — HTTP service mode (serve, :9001)
 │   │   ├── agent-card.json      # A2A identity descriptor
 │   │   └── .env                 # API keys (git-ignored)
 │   └── registry/                # Gateway capability manifest
@@ -123,7 +125,7 @@ kitt_gateway/
 
 | File | Purpose |
 |------|---------|
-| `hub/main.py` | **KITT Hub** — FastAPI app (port 8080). Serves the chat UI and exposes two endpoints: `POST /chat {prompt, models}` fans out to selected models via Agent Zero's `fan_out()`; `GET /health` probes MCP (:8000) and Ollama (:11434) with 2s timeouts, returns `{"status":"ok"\|"degraded","checks":{...}}` with HTTP 200/503. Imports `AgentZero` directly via `sys.path` injection. |
+| `hub/main.py` | **KITT Hub** — FastAPI app (port 8080). Serves the chat UI and exposes two endpoints: `POST /chat {prompt, models}` calls `POST http://127.0.0.1:9001/fan_out` on Agent Zero HTTP service (timeout 120s); returns `intent_flagged`, `intent_category`, `intent_score` alongside model responses; returns HTTP 503 `{"error":"Agent Zero unavailable"}` on `RequestException`. `GET /health` probes MCP (:8000) and Ollama (:11434) with 2s timeouts. Env toggle `USE_DIRECT_AGENT_ZERO=true` re-enables legacy `sys.path` import mode. |
 | `hub/kitt-hub.service` | systemd unit for the Hub. ExecStart: `python3 main.py` under user `doubl` (main.py invokes uvicorn internally in its `__main__` block). `Restart=always`. Declares `After=network.target docker.service`, `Wants=docker.service`. |
 | `hub/requirements.txt` | Pinned Hub dependencies (18 packages): fastapi, uvicorn, requests, python-dotenv, and transitive deps. |
 | `hub/static/` | Frontend assets served at `/static`. Contains `index.html` only — a self-contained single-file chat UI (HTML/CSS/JS inline). No separate JS or CSS files. |
@@ -132,9 +134,10 @@ kitt_gateway/
 
 | File | Purpose |
 |------|---------|
-| `a2a/agent_zero/agent.py` | **Agent Zero** — Core routing engine and autonomous daemon. `fan_out(prompt, models)` dispatches to up to 6 model backends in parallel via `ThreadPoolExecutor`, stores prompt + responses in MCP memory, and returns `{model: response}` dict. Default model list when `None` is passed: `["claude","openai","gemini","grok","perplexity"]` — `"local"` is not in the default and must be explicitly requested. `run_daemon()` loops every 60s: runs `system_health_check()` (probes MCP + Ollama, captures uptime/container count), logs structured JSON status to systemd journal, and writes a health report to MCP under `agent_id="kitt_status"`. `_history_to_messages()` caps context at `history[-6:]` for all models except Gemini. `call_gemini()` uses its own history slice of `[-4:]` and filters out response parts where `"thought": true` to strip gemini-2.5-flash extended thinking traces. |
-| `a2a/agent_zero/requirements.txt` | Pinned Agent Zero dependencies (6 packages): requests, python-dotenv, and transitive deps. |
-| `a2a/agent_zero/kitt-agent.service` | systemd unit for the Agent Zero daemon (`kitt-agent.service`). Runs `agent.py` under user `doubl`, `Restart=always`. |
+| `a2a/agent_zero/agent.py` | **Agent Zero** — Core routing engine, autonomous daemon, and HTTP service. `fan_out(prompt, models)` runs `check_intent()` (llama3.2 pre-screen), dispatches to up to 6 model backends in parallel via `ThreadPoolExecutor`, stores prompt + responses in MCP memory, returns `{"responses": {...}, "intent": {...}}`. Default model list when `None`: `["claude","openai","gemini","grok","perplexity"]`. `run_daemon()` loops every 60s for health telemetry. HTTP serve mode (`python agent.py serve`): FastAPI app on `:9001`, `POST /fan_out` endpoint, singleton `_agent_instance`. `call_gemini()` filters `"thought": true` parts (gemini-2.5-flash thinking traces). |
+| `a2a/agent_zero/requirements.txt` | Pinned Agent Zero dependencies (9 packages): requests, python-dotenv, fastapi, uvicorn, pydantic, and transitive deps. |
+| `a2a/agent_zero/kitt-agent.service` | systemd unit for the Agent Zero **daemon** (`kitt-agent.service`). Runs `agent.py` (no args) under user `doubl`, `Restart=always`. |
+| `a2a/agent_zero/kitt-agent-http.service` | systemd unit for the Agent Zero **HTTP service** (`kitt-agent-http.service`). Runs `agent.py serve` on loopback `:9001`. `EnvironmentFile` loads `.env`. `After=network.target docker.service`. `Restart=on-failure`. |
 | `a2a/agent_zero/agent-card.json` | A2A identity descriptor. Declares `agent_id`, SPIFFE ID (`spiffe://mpx.sovereign/agent_zero`), capabilities (`mcp_memory`, `inference_edge`), and security requirements. |
 | `a2a/agent_zero/.env` | API keys for all 5 external providers (git-ignored). Loaded at import time via `load_dotenv()`. |
 | `a2a/registry/gateway-manifest.json` | Gateway-level capability manifest. Lists capabilities, service ports, and active agent registry. |
@@ -203,6 +206,8 @@ kitt_gateway/
 | `MODEL` | `llama3.2:latest` | `agent.py:16` |
 | `AGENT_ID` | `agent_zero` | `agent.py:17` |
 | `HEARTBEAT_INTERVAL` | `60` (seconds) | `agent.py:18` |
+| `AGENT_URL` | `http://127.0.0.1:9001` | `hub/main.py` |
+| `USE_DIRECT_AGENT_ZERO` | `false` (default) | `hub/main.py` env toggle |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | `orchestrator/router.py:21` |
 | `SPIRE_SOCKET` | `/run/spire/sockets/agent.sock` | `mcp/server.py:10` (reserved, future use) |
 | `ATS_LOG_FILE` | `~/kitt_gateway/governance/telemetry/ats_audit.log` | `orchestrator/router.py:11` |
@@ -215,8 +220,9 @@ kitt_gateway/
 | `trust_domain` | `mpx.sovereign` | `spire/server/server.conf`, `spire/agent/agent.conf` |
 | `bind_port` (server) | `8081` | `spire/server/server.conf` |
 | `socket_path` (agent) | `/run/spire/sockets/agent.sock` | `spire/agent/agent.conf` |
-| `join_token` | `REDACTED_SPIRE_TOKEN_1` | `spire/agent/agent.conf` ⚠️ rotate |
-| `insecure_bootstrap` | `true` | `spire/agent/agent.conf` ⚠️ disable after attestation |
+| `join_token` | `fc0aa621-...` (consumed; emergency re-attest only) | `spire/agent/agent.conf` |
+| `insecure_bootstrap` | `false` ✅ | `spire/agent/agent.conf` |
+| `trust_bundle_path` | `/run/spire/config/bootstrap.crt` | `spire/agent/agent.conf` |
 | `ca_key_type` | `rsa-2048` | `spire/server/server.conf` |
 
 ### Docker Network
@@ -249,7 +255,9 @@ Browser  POST /chat {prompt, models}
     │
     └──▶ hub/main.py (kitt-hub.service, :8080)
               │
-              └──▶ AgentZero.fan_out(prompt, models)   [ThreadPoolExecutor]
+              └──▶ POST http://127.0.0.1:9001/fan_out  (kitt-agent-http.service)
+                        │
+                        └──▶ AgentZero.fan_out(prompt, models)   [ThreadPoolExecutor]
                         │
                         ├──▶ retrieve_context()  ──▶ GET MCP /context/retrieve
                         ├──▶ store_context(prompt)──▶ POST MCP /context/store
@@ -345,6 +353,7 @@ Port   Protocol   Bind            Service                      Exposure
 8080   TCP        0.0.0.0         KITT Hub (chat UI/router)    LAN-accessible
 8081   TCP        0.0.0.0 (host)  SPIRE Server                 Host network
 9000   TCP        0.0.0.0         A2A Proxy (nginx)            Public
+9001   TCP        127.0.0.1       Agent Zero HTTP service      Loopback only
 11434  TCP        127.0.0.1       Ollama inference             Loopback only
 50080  TCP        0.0.0.0         Stock Agent Zero (Docker)    LAN (separate)
 ```
@@ -366,10 +375,11 @@ docker-compose.yml                 kitt_sandbox          ubuntu:24.04           
 ### systemd Services
 
 ```
-Service             Unit File                            Status
-──────────────────  ───────────────────────────────────  ──────
-kitt-hub.service    hub/kitt-hub.service                 active
-kitt-agent.service  a2a/agent_zero/kitt-agent.service    active
+Service                   Unit File                                    Status
+────────────────────────  ───────────────────────────────────────────  ──────
+kitt-hub.service          hub/kitt-hub.service                         active
+kitt-agent.service        a2a/agent_zero/kitt-agent.service            active
+kitt-agent-http.service   a2a/agent_zero/kitt-agent-http.service       active
 ```
 
 ---
@@ -377,10 +387,10 @@ kitt-agent.service  a2a/agent_zero/kitt-agent.service    active
 ## 6. Security Notes
 
 - **Firewall (v2 baseline):** Default deny inbound. SSH restricted to `192.168.1.0/24`. Port 8080 (Hub) is LAN-accessible. Port 9000 (A2A nginx) is public.
-- **SPIRE join token** (`REDACTED_SPIRE_TOKEN_1`) is stored in plaintext in `spire/agent/agent.conf`. Rotate after first attestation. (I7 — open)
-- **`insecure_bootstrap: true`** in SPIRE agent — disable after the trust bundle is established. (I7 — open)
+- **SPIRE bootstrap hardened (I7 ✅):** `insecure_bootstrap = false`. Server trust bundle pinned at `spire/agent/bootstrap.crt` (mounted into agent at `/run/spire/config/bootstrap.crt`; referenced via `trust_bundle_path`). Agent verifies server TLS on every connection. Join token rotated 2026-03-13; current token (`fc0aa621-...`) is single-use/consumed. To re-attest after data dir wipe: `docker exec spire-server /opt/spire/bin/spire-server token generate -spiffeID spiffe://mpx.sovereign/spire-agent -ttl 3600`, update `agent.conf`, restart agent.
 - **`.gitignore`** excludes: `spire/data/`, `security/secrets/`, `*.key`, `*.pem`, `*.sock`, `*.sqlite3`, `shared_context/data/`, model blobs, Python caches, `.env`, `.claude/settings.local.json`.
 - **API keys** live in `a2a/agent_zero/.env` (git-ignored). Hub inherits them at import time via `load_dotenv()`.
 - **PQC intent:** `agent-card.json` declares `ML-KEM-768` — not yet implemented. (I3 — open)
-- **Intent gate:** `agent-card.json` declares `intent_gate_required: true` — no pre-call validation exists. Any string sent to `POST /chat` is forwarded verbatim. (I2 — open)
+- **Intent gate (I2 ✅):** `check_intent()` pre-screens every prompt via llama3.2 before `fan_out()` fires. Flag-only (never blocks). Categories: `none`, `prompt_injection`, `jailbreak`, `unsafe`. Flagged events logged to `ats_audit.log` (prompt hash only), MCP `kitt_status`, and systemd journal. Hub returns `intent_flagged`, `intent_category`, `intent_score` in every `/chat` response.
+- **Hub–Agent decoupling (A1 ✅):** Hub calls Agent Zero over `POST http://127.0.0.1:9001/fan_out` (loopback HTTP). No shared venv or `sys.path` injection. Hub returns 503 if Agent Zero HTTP service is down. Rollback toggle: `USE_DIRECT_AGENT_ZERO=true`.
 - **All containers** use `no-new-privileges: true`. MCP Server runs as non-root `mcp_user`.
