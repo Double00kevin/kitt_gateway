@@ -1,16 +1,30 @@
 import os
 import redis
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from spiffe.workloadapi.workload_api_client import WorkloadApiClient
 import uvicorn
 
 # --- Configuration ---
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = 6379
-SPIRE_SOCKET = "/run/spire/sockets/agent.sock" # For future use
+SPIRE_SOCKET = "/run/spire/sockets/agent.sock"
+
+# --- Lifespan ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Fetch MCP Server's own X.509-SVID from SPIRE workload API
+    try:
+        with WorkloadApiClient(socket_path=f"unix://{SPIRE_SOCKET}") as client:
+            svid = client.fetch_x509_svid()
+            print(f"[SPIRE] MCP Server SVID: {svid.spiffe_id}")
+    except Exception as e:
+        print(f"[SPIRE] SVID fetch failed (fail-open): {e}")
+    yield
 
 # --- FastAPI App ---
-app = FastAPI(title="KITT MCP Server")
+app = FastAPI(title="KITT MCP Server", lifespan=lifespan)
 
 # --- Redis Connection ---
 try:

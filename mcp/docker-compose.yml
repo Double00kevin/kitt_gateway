@@ -7,8 +7,11 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       - REDIS_HOST=mpx-shared-context
+      - PYTHONUNBUFFERED=1
     networks:
       - kitt_sovereign_net
+    volumes:
+      - /home/doubl/kitt_gateway/spire/sockets:/run/spire/sockets:ro
     security_opt:
       - no-new-privileges:true
 
