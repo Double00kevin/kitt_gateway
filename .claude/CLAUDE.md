@@ -8,7 +8,6 @@ Repo: `~/kitt_gateway`
 
 ## Canonical References
 Full technical detail lives in these files — do not duplicate here:
-- `PROJECT_CONTEXT.md`
 - `.claude/SYSTEM_BREAKDOWN.md`
 - `docs/intelligence_archive/` (historical only)
 
@@ -46,4 +45,4 @@ Close The Loop
 When I type "close the loop":
 
 Update this file’s “Last updated” date + any changed sections
-Give me the exact cat or echo commands to update PROJECT_CONTEXT.md and .claude/SYSTEM_BREAKDOWN.md if needed
+Give me the exact cat or echo commands to update .claude/SYSTEM_BREAKDOWN.md if needed

@@ -1,6 +1,6 @@
 # KITT Sovereign Gateway — TODO
 
-**Last updated:** 2026-03-13
+**Last updated:** 2026-03-14
 
 Issues are grouped by category. Bugs are things currently broken or that will break under predictable conditions. Incomplete components are things that are declared/stubbed but not implemented. Priorities are ordered within each section.
 
@@ -48,12 +48,9 @@ File deleted — nothing in the codebase read or wrote to it at runtime.
 
 ## Incomplete Components
 
-### I1 — SPIRE workload attestation not wired to any workload
-**Files:** `mcp/server.py:10`, `spire/agent/agent.conf`
+### ~~I1 — SPIRE workload attestation not wired to any workload~~ ✅ FIXED 2026-03-14
 
-`SPIRE_SOCKET = "/run/spire/sockets/agent.sock"` is defined in `mcp/server.py` with a `# For future use` comment. The socket is correctly bind-mounted into `kitt_sandbox`. The SPIRE Agent's Docker workload attestor is configured. But no code anywhere calls the SPIRE workload API to request an SVID. Zero-trust identity enforcement between services is not active.
-
-**Next step:** Use the `pyspiffe` library in the MCP Server to fetch an X.509-SVID from the socket before accepting requests, or use it to mutually authenticate between Agent Zero and the MCP Server.
+`mcp/server.py` now has a FastAPI lifespan that fetches the MCP Server's own X.509-SVID from the SPIRE workload API at startup using `spiffe.workloadapi.WorkloadApiClient(socket_path="unix:///run/spire/sockets/agent.sock")`. Fail-open: any exception logs `[SPIRE] SVID fetch failed (fail-open): <reason>` and MCP continues serving normally. Socket bind-mounted `:ro` into `mpx-mcp-server` via `mcp/docker-compose.yml`. `mcp/requirements.txt` pinned (14 packages) with `spiffe==0.2.5` (HewlettPackard py-spiffe). `PYTHONUNBUFFERED=1` added to container env for visible docker logs output. Workload entry registered 2026-03-14 (entry `073f4fd3`); SPIRE agent updated with `/var/run/docker.sock` mount and `pid: host` to enable Docker workload attestation. MCP now logs `[SPIRE] MCP Server SVID: spiffe://mpx.sovereign/mcp` on startup.
 
 ---
 
@@ -152,9 +149,10 @@ The capability endpoints listed in Agent Zero's card (`http://localhost:8000`, `
 
 Ordered by impact-to-effort ratio:
 
-1. **Wire SPIRE attestation (I1)** — prerequisite for zero-trust enforcement
+1. ~~**Wire SPIRE attestation (I1)**~~ ✅ DONE — SVID fetch at MCP startup, fail-open
 2. ~~**Finalize SPIRE bootstrap (I7)**~~ ✅ DONE
-3. **Pin `mcp/requirements.txt`** — match pattern of `hub/requirements.txt`
+3. ~~**Pin `mcp/requirements.txt`**~~ ✅ DONE — 14 packages pinned with spiffe==0.2.5
 4. ~~**Decouple Hub from Agent Zero (A1)**~~ ✅ DONE
-5. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
-6. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`
+5. ~~**Register MCP workload entry in SPIRE**~~ ✅ DONE — entry `073f4fd3`, selectors on compose labels, SPIRE agent now has docker.sock + pid:host
+6. **Fix A2A agent-card endpoints (A2)** — replace `localhost` refs with LAN-accessible addresses
+7. **Implement edge capabilities (I4)** — `pii_masking`, `intent_classification`, `local_routing`

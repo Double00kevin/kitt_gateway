@@ -16,7 +16,9 @@ services:
       - ./data/agent:/run/spire/data:rw
       - /home/doubl/kitt_gateway/spire/sockets:/run/spire/sockets:rw
       - ./bootstrap.crt:/run/spire/bootstrap.crt:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["-config", "/run/spire/config/agent.conf"]
     network_mode: host
+    pid: host
     depends_on:
       - spire-server

@@ -1,6 +1,6 @@
 # KITT Sovereign Gateway — System Breakdown
 
-**Updated:** 2026-03-13
+**Updated:** 2026-03-14
 **Architecture Codename:** MadProjx-v1
 **Gateway ID:** KITT-Sovereign-Gateway v1.1.0
 
@@ -147,9 +147,9 @@ kitt_gateway/
 | File | Purpose |
 |------|---------|
 | `docker-compose.yml` | Defines `kitt_sandbox` — Ubuntu 24.04 container with GPU passthrough on `kitt_sovereign_net`. |
-| `mcp/server.py` | **MCP Server** — FastAPI REST shim over Redis (port 8000). `POST /context/store` writes agent context (capped at 5 entries per `agent_id`). `GET /context/retrieve` fetches stored context. `GET /health` returns Redis connection status. |
-| `mcp/docker-compose.yml` | Deploys `mpx-mcp-server` on `kitt_sovereign_net`. Connects to Redis via Docker DNS name `mpx-shared-context`. |
-| `mcp/requirements.txt` | **Unpinned** MCP dependencies: `fastapi`, `uvicorn`, `redis` (no version pins). Unlike `hub/requirements.txt`, these are not frozen — pin before production. |
+| `mcp/server.py` | **MCP Server** — FastAPI REST shim over Redis (port 8000). `POST /context/store` writes agent context (capped at 5 entries per `agent_id`). `GET /context/retrieve` fetches stored context. `GET /health` returns Redis connection status. Lifespan startup (I1 ✅): fetches own X.509-SVID from SPIRE workload API via `spiffe.workloadapi.WorkloadApiClient`; logs SPIFFE ID or fail-open message if socket unavailable. |
+| `mcp/docker-compose.yml` | Deploys `mpx-mcp-server` on `kitt_sovereign_net`. Connects to Redis via Docker DNS name `mpx-shared-context`. SPIRE agent socket mounted read-only at `/run/spire/sockets` (I1 ✅). `PYTHONUNBUFFERED=1` set for visible stdout in `docker logs`. |
+| `mcp/requirements.txt` | Pinned MCP dependencies (14 packages): `fastapi==0.134.0`, `uvicorn==0.41.0`, `redis==7.2.1`, `spiffe==0.2.5` (py-spiffe, HewlettPackard), and transitive deps. Frozen 2026-03-14. |
 | `orchestrator/router.py` | **LangGraph Orchestrator** — One-shot stateful workflow. `AgentState` TypedDict: `messages: Annotated[list[str], operator.add]`. Single node "router" (`process_node`). Reads `mission_status` from Redis, invokes `ChatOllama(model="llama3.2")` (model string is `"llama3.2"`, not `"llama3.2:latest"`), writes actual LLM response back to Redis. Logs 4 event types to ATS audit log. Run manually; not integrated into Hub request path. |
 | `shared_context/docker-compose.yaml` | Runs `redis:alpine` as `mpx-shared-context` on `127.0.0.1:6379`, joined to `kitt_sovereign_net`. Persists data via `--save 60 1`. |
 | `inference/docker-compose.yaml` | Runs `ollama/ollama:latest` as `mpx-inference-edge` on `127.0.0.1:11434` with 1 NVIDIA GPU reserved. |
@@ -167,7 +167,7 @@ kitt_gateway/
 |------|---------|
 | `spire/server/server.conf` | SPIRE Server config. Binds to `0.0.0.0:8081`. Trust domain `mpx.sovereign`. SQLite3 datastore, `join_token` node attestor. |
 | `spire/agent/agent.conf` | SPIRE Agent config. Connects to server at `127.0.0.1:8081`. Exposes workload API socket. `insecure_bootstrap: true` (initial setup — not yet hardened). |
-| `spire/docker-compose.yaml` | Runs `spire-server` and `spire-agent` (v1.11.0) in `network_mode: host`. |
+| `spire/docker-compose.yaml` | Runs `spire-server` and `spire-agent` (v1.11.0) in `network_mode: host`. Agent has `/var/run/docker.sock` mounted `:ro` (Docker workload attestor) and `pid: host` (required so agent can read `/proc/<pid>/cgroup` for caller containers). |
 
 ### Governance & Security
 
@@ -209,9 +209,9 @@ kitt_gateway/
 | `AGENT_URL` | `http://127.0.0.1:9001` | `hub/main.py` |
 | `USE_DIRECT_AGENT_ZERO` | `false` (default) | `hub/main.py` env toggle |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | `orchestrator/router.py:21` |
-| `SPIRE_SOCKET` | `/run/spire/sockets/agent.sock` | `mcp/server.py:10` (reserved, future use) |
+| `SPIRE_SOCKET` | `/run/spire/sockets/agent.sock` | `mcp/server.py:12` — active; used in lifespan SVID fetch (I1 ✅) |
 | `ATS_LOG_FILE` | `~/kitt_gateway/governance/telemetry/ats_audit.log` | `orchestrator/router.py:11` |
-| `PYTHONUNBUFFERED` | `1` | `kitt-agent.service` only (not set in `kitt-hub.service`) |
+| `PYTHONUNBUFFERED` | `1` | `kitt-agent.service`; `mcp/docker-compose.yml` (added 2026-03-14) |
 
 ### SPIRE Configuration
 
@@ -367,8 +367,8 @@ shared_context/docker-compose.yaml mpx-shared-context    redis:alpine           
 inference/docker-compose.yaml      mpx-inference-edge    ollama/ollama:latest                up
 mcp/docker-compose.yml             mpx-mcp-server        python:3.12-slim (built)            up
 a2a_proxy/docker-compose.yaml      mpx-a2a-proxy         nginx:alpine                        down
-spire/docker-compose.yaml          spire-server          ghcr.io/spiffe/spire-server:1.11.0  down
-spire/docker-compose.yaml          spire-agent           ghcr.io/spiffe/spire-agent:1.11.0   down
+spire/docker-compose.yaml          spire-server          ghcr.io/spiffe/spire-server:1.11.0  up
+spire/docker-compose.yaml          spire-agent           ghcr.io/spiffe/spire-agent:1.11.0   up
 docker-compose.yml                 kitt_sandbox          ubuntu:24.04                        down
 ```
 
@@ -391,6 +391,7 @@ kitt-agent-http.service   a2a/agent_zero/kitt-agent-http.service       active
 - **`.gitignore`** excludes: `spire/data/`, `security/secrets/`, `*.key`, `*.pem`, `*.sock`, `*.sqlite3`, `shared_context/data/`, model blobs, Python caches, `.env`, `.claude/settings.local.json`.
 - **API keys** live in `a2a/agent_zero/.env` (git-ignored). Hub inherits them at import time via `load_dotenv()`.
 - **PQC intent:** `agent-card.json` declares `ML-KEM-768` — not yet implemented. (I3 — open)
+- **SVID fetch at startup (I1 ✅, workload entry registered ✅):** `mcp/server.py` lifespan fetches MCP Server's own X.509-SVID from SPIRE workload API using `spiffe.workloadapi.WorkloadApiClient(socket_path="unix:///run/spire/sockets/agent.sock")`. Fail-open: any exception logs `[SPIRE] SVID fetch failed (fail-open): <reason>` and MCP continues serving. Workload entry registered 2026-03-14: entry ID `073f4fd3-ebf5-45dc-902c-feabf9459805`, SPIFFE ID `spiffe://mpx.sovereign/mcp`, selectors `docker:label:com.docker.compose.project:mcp` + `docker:label:com.docker.compose.service:mcp-server`, parentID `spiffe://mpx.sovereign/spire/agent/join_token/fc0aa621-228a-4667-97a7-a63e0f6b73cc`. MCP now logs `[SPIRE] MCP Server SVID: spiffe://mpx.sovereign/mcp` on startup. Socket mounted `:ro` into container. Note: if agent re-attests with a new join token, parentID must be updated.
 - **Intent gate (I2 ✅):** `check_intent()` pre-screens every prompt via llama3.2 before `fan_out()` fires. Flag-only (never blocks). Categories: `none`, `prompt_injection`, `jailbreak`, `unsafe`. Flagged events logged to `ats_audit.log` (prompt hash only), MCP `kitt_status`, and systemd journal. Hub returns `intent_flagged`, `intent_category`, `intent_score` in every `/chat` response.
 - **Hub–Agent decoupling (A1 ✅):** Hub calls Agent Zero over `POST http://127.0.0.1:9001/fan_out` (loopback HTTP). No shared venv or `sys.path` injection. Hub returns 503 if Agent Zero HTTP service is down. Rollback toggle: `USE_DIRECT_AGENT_ZERO=true`.
 - **All containers** use `no-new-privileges: true`. MCP Server runs as non-root `mcp_user`.
