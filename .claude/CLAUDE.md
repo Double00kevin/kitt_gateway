@@ -1,11 +1,18 @@
 # KITT Gateway — AI Context
-> Last updated: 2026-03-17
+> Last updated: 2026-03-18
 
 ## Project Identity
 
 Sovereign AI gateway stack on KITT server. Multi-model fan-out engine (5 external + 1 local), SPIFFE/SPIRE zero-trust identity, Redis blackboard memory, Docker + systemd hybrid. Single operator, security-first.
 
 Repo: `~/kitt_gateway`
+
+## Model & Settings Guidance
+Default model for ALL work: Opus 4.6
+- Use Opus 4.6 on every single turn, every subagent, every agent team.
+- I will change the model myself in the Desktop/Code tab dropdown if I ever want something different.
+- Never suggest or switch to Sonnet, Haiku, or any other model.
+- Effort level: high (default). Use "ultrathink" keyword only when I explicitly type it.
 
 ## Repo Tree
 
@@ -65,7 +72,11 @@ cd orchestrator && source .venv/bin/activate && python router.py
 
 ## Close The Loop
 
-When I type "close the loop": update this file's "Last updated" date + any changed sections, then give me the exact commands to update SYSTEM_BREAKDOWN.md if needed.
+When I type "close the loop":
+1. Update this file's "Last updated" date + any changed sections
+2. Update `.claude/SYSTEM_BREAKDOWN.md` — if any architectural, port, or service changes were made
+3. Update `.claude/TODO.md` — if any bugs were fixed or items completed
+4. Skip docs that had no relevant changes this session (don't add empty entries)
 
 ---
 
