@@ -5,5 +5,5 @@ New profiles: skip
 
 To                         Action      From
 --                         ------      ----
-22/tcp                     ALLOW IN    192.168.1.0/24            
+22/tcp                     ALLOW IN    <INTERNAL_SUBNET>/24            
 
