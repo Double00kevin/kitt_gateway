@@ -38,3 +38,6 @@ shared_context/data/
 shared_context/*.rdb
 docker_data/
 *.log
+
+# Claude Code project context (internal)
+.claude/
