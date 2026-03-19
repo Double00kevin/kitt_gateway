@@ -166,7 +166,7 @@ $ bash governance/kill_switch.sh
 ### Network
 
 - Default deny firewall (UFW)
-- SSH restricted to LAN (192.168.1.0/24)
+- SSH restricted to LAN (<INTERNAL_SUBNET>/24)
 - Internal services bound to 127.0.0.1
 - Docker network `kitt_sovereign_net` isolates container traffic
 

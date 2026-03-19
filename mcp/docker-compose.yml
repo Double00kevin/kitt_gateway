@@ -11,7 +11,7 @@ services:
     networks:
       - kitt_sovereign_net
     volumes:
-      - /home/doubl/kitt_gateway/spire/sockets:/run/spire/sockets:ro
+      - /home/<operator>/kitt_gateway/spire/sockets:/run/spire/sockets:ro
     security_opt:
       - no-new-privileges:true
 

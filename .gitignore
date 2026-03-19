@@ -13,6 +13,7 @@ spire/socket/
 *.sock
 *.pem
 *.key
+*.crt
 
 # Environment Variables & Secrets
 .env
