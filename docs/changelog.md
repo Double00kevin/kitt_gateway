@@ -49,6 +49,3 @@
 
 ## 2026-03-19
 - Removed "Model & Settings Guidance" section from .claude/CLAUDE.md (cross-repo cleanup)
-
-## 2026-03-19
-- Removed "Model & Settings Guidance" section from .claude/CLAUDE.md (cross-repo cleanup)

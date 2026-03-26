@@ -49,7 +49,9 @@ KITT Gateway is a **local-first, sovereign AI infrastructure** that fans out pro
 - **Multi-model fan-out:** Simultaneous dispatch to up to 6 backends (5 external + 1 local)
 - **Sovereign/air-gap capable:** All inference can fall back to Ollama + llama3.2
 - **Zero-trust identity:** SPIFFE SVIDs issued per workload by SPIRE
-- **Blackboard memory:** Redis as the single shared state store
+- **Blackboard memory:** Redis as the single shared state store (context + event bus)
+- **Event-driven audit:** All security events flow through Redis Streams with structured emit/read
+- **Defense in depth:** Intent gate (LLM) + regex detectors (PII, exfiltration, injection) + bearer token auth + rate limiting
 - **Hardened containers:** `no-new-privileges`, non-root users, read-only config mounts
 - **Governance:** ISO 42001-aligned kill switch for immediate cessation
 
@@ -67,14 +69,22 @@ kitt_gateway/
 ├── a2a_proxy/               # A2A discovery proxy (nginx)
 │   └── html/.well-known/    # Public agent-card endpoint
 ├── config/                  # Read-only kernel/config markers
-├── docs/                    # Documentation
+├── docs/                    # Documentation (changelog, roadmap, architecture, intel archive)
+├── events/                  # Live Threat Defense pipeline
+│   ├── bus.py               # Redis Streams event bus (kitt:events stream)
+│   ├── detectors.py         # Regex threat detectors (PII, exfiltration, injection)
+│   ├── dashboard.py         # Event aggregation + posture scoring (0-100)
+│   ├── payloads.py          # Attack payload library loader (OWASP LLM Top 10)
+│   └── report.py            # PDF security report export
 ├── governance/
 │   ├── kill_switch.sh       # Emergency stop script
 │   └── telemetry/           # ATS audit log output
-├── hub/                     # KITT Hub: chat UI + model router
-│   ├── main.py              # FastAPI app (:8080)
+├── hub/                     # KITT Hub: chat UI + model router + dashboard
+│   ├── main.py              # FastAPI app (:8080) — auth, rate limiting, all API routes
 │   ├── kitt-hub.service     # systemd unit
-│   └── static/              # Frontend assets
+│   ├── demo_payloads.json   # 30+ OWASP-mapped attack payloads
+│   └── static/
+│       └── dashboard.html   # Live Threat Defense Dashboard UI
 ├── inference/               # Ollama edge inference engine
 ├── mcp/                     # MCP Server (FastAPI context API over Redis)
 │   ├── server.py            # REST shim with SPIRE SVID fetch at startup
@@ -84,11 +94,20 @@ kitt_gateway/
 │   └── router.py            # One-shot stateful graph execution
 ├── scripts/                 # Operational automation
 ├── security/                # Firewall baselines
+├── shared/                  # Shared modules
+│   └── health.py            # DRY health checks (MCP, Ollama, Redis)
 ├── shared_context/          # Redis blackboard
 │   └── docker-compose.yaml
 ├── spire/                   # SPIFFE/SPIRE identity framework
 │   ├── agent/               # SPIRE agent config
 │   └── server/              # SPIRE server config
+├── tests/                   # pytest suite (83 tests, 6 files)
+│   ├── test_bus.py          # Event bus unit + integration tests
+│   ├── test_detectors.py    # Detector patterns + edge cases
+│   ├── test_dashboard.py    # Stats computation + posture score
+│   ├── test_payloads.py     # Payload library loading + filtering
+│   ├── test_report.py       # PDF generation + unicode handling
+│   └── test_hub_routes.py   # All 11 Hub routes, auth, error cases
 └── docker-compose.yml       # Root gateway sandbox definition
 ```
 
@@ -97,13 +116,16 @@ kitt_gateway/
 ### Primary Request Path
 
 ```
-Browser  POST /chat {prompt, models}
+Browser  POST /api/chat {prompt, models}
+    │    Authorization: Bearer <KITT_HUB_API_KEY>
     │
     └──▶ hub/main.py (:8080)
+              │  [bearer token auth + rate limiting (10/min via slowapi)]
               │
               └──▶ POST http://127.0.0.1:9001/fan_out
                         │
                         ├──▶ check_intent() via llama3.2 (local pre-screen)
+                        │         └──▶ emit("intent_gate", ...) → Redis Streams
                         ├──▶ retrieve_context() from MCP
                         ├──▶ store_context(prompt) to MCP
                         │
@@ -114,7 +136,30 @@ Browser  POST /chat {prompt, models}
                         ├──▶ call_perplexity() ──▶ Perplexity API
                         └──▶ call_local()      ──▶ Ollama (:11434)
                                   │
+                                  ├──▶ detectors.scan() → PII, exfiltration, injection checks
+                                  │         └──▶ emit("detection", ...) → Redis Streams
                                   └──▶ return {model: response} to Hub → Browser
+```
+
+### Events Pipeline
+
+```
+Any component ──▶ events.bus.emit(layer, event_type, details, severity, request_id)
+                        │
+                        └──▶ Redis Streams (kitt:events, MAXLEN 10k)
+                                  │
+                                  ├──▶ GET /api/dashboard → events.dashboard.get_stats()
+                                  │         └──▶ posture score (0-100), severity breakdown, layer stats
+                                  │
+                                  ├──▶ GET /api/demo (SSE) → fire attack payloads in sequence
+                                  │         └──▶ events.payloads → 30+ OWASP LLM Top 10 mapped
+                                  │
+                                  ├──▶ POST /api/replay/{event_id} → replay single event
+                                  │
+                                  ├──▶ GET /api/report/pdf → events.report.generate_pdf()
+                                  │         └──▶ board-ready posture assessment
+                                  │
+                                  └──▶ WS /ws/events → live WebSocket stream (token auth via query param)
 ```
 
 ### Health Monitoring (every 60s)
@@ -177,17 +222,33 @@ $ bash governance/kill_switch.sh
 - Config files mounted read-only where possible
 - SPIRE agent socket mounted read-only into workload containers
 
+### Authentication & Rate Limiting
+
+- Bearer token auth on all Hub API endpoints (`Authorization: Bearer <KITT_HUB_API_KEY>`)
+- WebSocket auth via query parameter (`/ws/events?token=<token>`)
+- Rate limiting on `/chat` — 10 requests/min per IP (slowapi)
+- API key configured via `KITT_HUB_API_KEY` environment variable
+
 ### Intent Screening
 
 - `check_intent()` pre-screens every prompt via llama3.2 before fan-out
 - Categories: `none`, `prompt_injection`, `jailbreak`, `unsafe`
 - Flag-only mode — never blocks, always logs
-- Flagged events logged to ATS audit log (prompt hash only, not plaintext)
+- All intent events emitted to Redis Streams (`kitt:events`)
 - Hub returns `intent_flagged`, `intent_category`, `intent_score` in every response
+
+### Threat Detection Pipeline
+
+- Regex-based detectors run on every request after fan-out (`events/detectors.py`)
+- PII detection: SSN, email, phone, credit card patterns
+- Data exfiltration: base64 blocks, URL encoding, "send to" patterns
+- Indirect prompt injection: ignore_previous, system_prefix, role_override
+- All findings emitted to Redis Streams with type, subtype, confidence, and severity
+- Detectors run as a separate pipeline stage from the intent gate
 
 ### Governance
 
 - Kill switch halts inference and external communication
 - Redis and SPIRE remain running (preserves state and identity)
-- Append-only ATS audit log for all orchestrator events
+- Append-only Redis Streams audit trail for all security events (10k max, TTL-trimmed)
 - ISO 42001 alignment for AI system governance
