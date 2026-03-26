@@ -16,6 +16,12 @@ Current status and planned work for KITT Sovereign Gateway.
 | I2 | Intent gate implemented — llama3.2 pre-screens all prompts | 2026-03-13 |
 | I5 | Agent Zero daemon loop connected to health monitoring | 2026-03-01 |
 | I6 | Hub /health endpoint validates MCP and Ollama connectivity | 2026-03-01 |
+| S1 | Hub bearer token auth + rate limiting on /chat | 2026-03-19 |
+| D1 | Live Threat Defense Dashboard — event bus, detectors, replay, demo mode | 2026-03-26 |
+| D2 | Attack payload library — 30+ OWASP LLM Top 10 mapped payloads | 2026-03-26 |
+| D3 | PDF security report export — board-ready posture assessment | 2026-03-26 |
+| D4 | Shared health module — DRY extraction from Hub, Agent, Dashboard | 2026-03-26 |
+| T1 | Comprehensive test suite — 83 tests across 6 test files | 2026-03-26 |
 | I7 | SPIRE bootstrap hardened — insecure_bootstrap=false, bundle pinned | 2026-03-13 |
 | A1 | Hub decoupled from Agent Zero — HTTP service on loopback :9001 | 2026-03-13 |
 | M1-M4 | Missing repo files committed (service units, .env.example, pinned deps, docs) | 2026-02-28 to 2026-03-01 |
@@ -48,9 +54,9 @@ The current architecture supports a single Agent Zero instance. Planned: registr
 
 Governance currently consists of the kill switch and audit logging. Planned: declarative policy rules (YAML) for controlling which agents can communicate, which models they can access, and what data can flow between them.
 
-### Expanded intent categories
+### ~~Expanded intent categories~~ → Completed (2026-03-26)
 
-The intent gate currently flags four categories (none, prompt_injection, jailbreak, unsafe). Planned: PII detection, data exfiltration patterns, and custom category definitions.
+PII detection, data exfiltration patterns, and indirect injection detection implemented in `events/detectors.py`. Regex-first approach for predictable latency. Intent gate retains the original 4 categories; new detectors run as a separate pipeline stage.
 
 ### Edge capabilities
 

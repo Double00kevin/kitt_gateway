@@ -3,10 +3,11 @@ Description=KITT Agent Zero (Sovereign Administrator)
 After=network.target docker.service
 
 [Service]
-User=<operator>
-Group=<operator>
-WorkingDirectory=/home/<operator>/kitt_gateway/a2a/agent_zero
-ExecStart=/home/<operator>/kitt_gateway/a2a/agent_zero/venv/bin/python /home/<operator>/kitt_gateway/a2a/agent_zero/agent.py
+User=doubl
+Group=doubl
+WorkingDirectory=/home/doubl/kitt_gateway/a2a/agent_zero
+EnvironmentFile=/home/doubl/kitt_gateway/a2a/agent_zero/.env
+ExecStart=/home/doubl/kitt_gateway/venv/bin/python agent.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

@@ -3,12 +3,15 @@ Description=KITT Agent Zero HTTP Service
 After=network.target docker.service
 
 [Service]
-User=<operator>
-WorkingDirectory=/home/<operator>/kitt_gateway/a2a/agent_zero
-EnvironmentFile=/home/<operator>/kitt_gateway/a2a/agent_zero/.env
-ExecStart=/home/<operator>/kitt_gateway/a2a/agent_zero/venv/bin/python agent.py serve
+User=doubl
+WorkingDirectory=/home/doubl/kitt_gateway/a2a/agent_zero
+EnvironmentFile=/home/doubl/kitt_gateway/a2a/agent_zero/.env
+ExecStart=/home/doubl/kitt_gateway/venv/bin/python agent.py serve
 Restart=on-failure
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

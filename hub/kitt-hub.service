@@ -5,13 +5,14 @@ Wants=docker.service
 
 [Service]
 Type=simple
-User=<operator>
-WorkingDirectory=/home/<operator>/kitt_gateway/hub
-ExecStart=/home/<operator>/kitt_gateway/hub/venv/bin/python3 main.py
+User=doubl
+WorkingDirectory=/home/doubl/kitt_gateway/hub
+ExecStart=/home/doubl/kitt_gateway/venv/bin/python main.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

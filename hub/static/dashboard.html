@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K.I.T.T. — Threat Defense Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000; --surface: #0a0a0a; --surface2: #111;
+    --border: #1a1a1a; --red: #ff1a00; --red-glow: #ff4422;
+    --red-dim: #3a0800; --amber: #ff8c00; --text: #cc9966;
+    --text-dim: #664433; --green: #00ff41; --yellow: #ffcc00;
+    --blue: #4488ff; --purple: #cc44ff; --cyan: #00ccff;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; overflow-x: hidden;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* HEADER */
+  .header {
+    background: #000; border-bottom: 2px solid #1a0800;
+    padding: 0.6rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left { display: flex; align-items: center; gap: 1.2rem; }
+  .logo { font-family: 'Orbitron'; font-weight: 900; font-size: 1.3rem; color: var(--red);
+    text-shadow: 0 0 10px var(--red), 0 0 30px var(--red-glow); letter-spacing: 0.3em; }
+  .logo-sub { font-family: 'Orbitron'; font-size: 0.5rem; color: var(--text-dim); letter-spacing: 0.2em; }
+  .header-right { display: flex; gap: 0.8rem; align-items: center; }
+  .nav-link { font-family: 'Orbitron'; font-size: 0.55rem; color: var(--text-dim);
+    letter-spacing: 0.15em; text-decoration: none; padding: 0.3rem 0.6rem;
+    border: 1px solid transparent; transition: all 0.15s; }
+  .nav-link:hover { color: var(--red); border-color: var(--red); }
+  .nav-link.active { color: var(--red); border-color: var(--red); background: #150400; }
+
+  /* SCORE CARD */
+  .score-section { display: flex; gap: 1rem; padding: 1rem 1.5rem; flex-wrap: wrap; }
+  .score-card {
+    background: #030000; border: 1px solid #1a0800; border-radius: 2px;
+    padding: 1rem 1.2rem; flex: 1; min-width: 200px;
+  }
+  .score-label { font-family: 'Orbitron'; font-size: 0.5rem; color: var(--text-dim);
+    letter-spacing: 0.2em; margin-bottom: 0.5rem; }
+  .score-value { font-family: 'Orbitron'; font-size: 2.5rem; font-weight: 900; }
+  .score-value.strong { color: var(--green); text-shadow: 0 0 20px var(--green); }
+  .score-value.moderate { color: var(--yellow); text-shadow: 0 0 20px var(--yellow); }
+  .score-value.weak { color: var(--red); text-shadow: 0 0 20px var(--red); }
+  .score-rating { font-family: 'Orbitron'; font-size: 0.6rem; margin-top: 0.3rem; letter-spacing: 0.15em; }
+  .score-breakdown { margin-top: 0.6rem; font-size: 0.7rem; line-height: 1.8; }
+  .score-breakdown span { color: var(--text-dim); }
+
+  .stat-value { font-family: 'Orbitron'; font-size: 1.8rem; font-weight: 700; color: var(--amber); }
+  .stat-sub { font-size: 0.65rem; color: var(--text-dim); margin-top: 0.3rem; }
+
+  /* CONTROLS */
+  .controls { padding: 0.5rem 1.5rem; display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+  .ctrl-btn {
+    padding: 0.35rem 1rem; border: 1px solid #2a1000; border-radius: 2px;
+    background: #030000; color: var(--text-dim); font-family: 'Orbitron';
+    font-size: 0.52rem; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s;
+  }
+  .ctrl-btn:hover { border-color: var(--red); color: var(--red); }
+  .ctrl-btn.active { background: #150400; border-color: var(--red); color: var(--red);
+    box-shadow: 0 0 10px rgba(255,26,0,0.3); }
+  .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ctrl-btn.demo { border-color: var(--green); color: var(--green); }
+  .ctrl-btn.demo:hover { box-shadow: 0 0 10px rgba(0,255,65,0.3); }
+  .ctrl-btn.demo:disabled { border-color: var(--text-dim); color: var(--text-dim); }
+  .ctrl-btn.export { border-color: var(--cyan); color: var(--cyan); }
+  .ctrl-btn.export:hover { box-shadow: 0 0 10px rgba(0,204,255,0.3); }
+  .demo-status { font-size: 0.6rem; color: var(--green); font-family: 'Orbitron'; letter-spacing: 0.1em; }
+
+  /* EVENT FEED */
+  .feed-section { padding: 0.5rem 1.5rem; }
+  .feed-label { font-family: 'Orbitron'; font-size: 0.5rem; color: var(--text-dim);
+    letter-spacing: 0.2em; margin-bottom: 0.5rem; }
+  .feed { max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .feed::-webkit-scrollbar { width: 3px; }
+  .feed::-webkit-scrollbar-track { background: #000; }
+  .feed::-webkit-scrollbar-thumb { background: #2a0800; }
+
+  .event-row {
+    display: grid; grid-template-columns: 140px 100px 100px 1fr 70px;
+    gap: 0.5rem; padding: 0.3rem 0.5rem; font-size: 0.7rem;
+    border-left: 2px solid transparent; background: #020000;
+    cursor: pointer; transition: background 0.1s;
+  }
+  .event-row:hover { background: #0a0300; }
+  .event-row.severity-warning { border-left-color: var(--yellow); }
+  .event-row.severity-critical { border-left-color: var(--red); }
+  .event-row.severity-info { border-left-color: #333; }
+  .event-ts { color: var(--text-dim); font-size: 0.65rem; }
+  .event-layer { color: var(--cyan); font-family: 'Orbitron'; font-size: 0.5rem; letter-spacing: 0.05em; }
+  .event-type { color: var(--amber); }
+  .event-detail { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .event-sev { font-family: 'Orbitron'; font-size: 0.48rem; text-align: right; letter-spacing: 0.1em; }
+  .event-sev.warning { color: var(--yellow); }
+  .event-sev.critical { color: var(--red); text-shadow: 0 0 8px var(--red); }
+  .event-sev.info { color: #555; }
+
+  /* REPLAY PANEL */
+  .replay-panel {
+    margin: 0.5rem 1.5rem; padding: 1rem; background: #030000;
+    border: 1px solid #1a0800; border-radius: 2px; display: none;
+  }
+  .replay-panel.active { display: block; }
+  .replay-title { font-family: 'Orbitron'; font-size: 0.6rem; color: var(--red);
+    letter-spacing: 0.2em; margin-bottom: 0.8rem; }
+  .timeline { display: flex; flex-direction: column; gap: 4px; }
+  .timeline-event {
+    display: flex; align-items: center; gap: 0.8rem; padding: 0.4rem 0.6rem;
+    border-left: 3px solid var(--text-dim); opacity: 0.3; transition: all 0.3s;
+  }
+  .timeline-event.active { opacity: 1; border-left-color: var(--red);
+    background: rgba(255,26,0,0.03); }
+  .timeline-event.played { opacity: 0.7; border-left-color: var(--green); }
+  .timeline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .timeline-event.active .timeline-dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .timeline-event.played .timeline-dot { background: var(--green); }
+  .timeline-info { font-size: 0.7rem; }
+  .timeline-layer { font-family: 'Orbitron'; font-size: 0.5rem; color: var(--cyan); }
+  .replay-controls { margin-top: 0.8rem; display: flex; gap: 0.5rem; }
+
+  /* MODEL COMPARISON */
+  .comparison-panel {
+    margin: 0.5rem 1.5rem; padding: 1rem; background: #030000;
+    border: 1px solid #1a0800; border-radius: 2px; display: none;
+  }
+  .comparison-panel.active { display: block; }
+  .comp-title { font-family: 'Orbitron'; font-size: 0.6rem; color: var(--amber);
+    letter-spacing: 0.2em; margin-bottom: 0.8rem; }
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.5rem; }
+  .comp-card { background: #020000; border: 1px solid #1a0800; border-radius: 2px; }
+  .comp-card-header { padding: 0.3rem 0.6rem; border-bottom: 1px solid #1a0800;
+    font-family: 'Orbitron'; font-size: 0.5rem; letter-spacing: 0.1em; }
+  .comp-card-body { padding: 0.5rem 0.6rem; font-size: 0.7rem; line-height: 1.6;
+    max-height: 150px; overflow-y: auto; color: #aa7744; white-space: pre-wrap; word-break: break-word; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 3rem; }
+  .empty-icon { font-size: 3rem; color: #1a0500; margin-bottom: 1rem; }
+  .empty-text { font-family: 'Orbitron'; font-size: 0.6rem; color: var(--text-dim);
+    letter-spacing: 0.2em; line-height: 2; }
+
+  /* BANNER */
+  .banner { padding: 0.4rem 1.5rem; font-family: 'Orbitron'; font-size: 0.5rem;
+    letter-spacing: 0.15em; }
+  .banner.error { background: #1a0000; color: var(--red); border-bottom: 1px solid #3a0800; }
+  .banner.success { background: #001a00; color: var(--green); border-bottom: 1px solid #003a00; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div>
+      <div class="logo">K.I.T.T.</div>
+      <div class="logo-sub">THREAT DEFENSE DASHBOARD</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/" class="nav-link">CHAT</a>
+    <a href="/dashboard" class="nav-link active">DEFENSE</a>
+  </div>
+</div>
+
+<div id="banner-area"></div>
+
+<div class="score-section">
+  <div class="score-card">
+    <div class="score-label">SECURITY POSTURE</div>
+    <div class="score-value weak" id="posture-score">--</div>
+    <div class="score-rating" id="posture-rating">INITIALIZING</div>
+    <div class="score-breakdown" id="posture-breakdown"></div>
+  </div>
+  <div class="score-card">
+    <div class="score-label">EVENTS CAPTURED</div>
+    <div class="stat-value" id="total-events">0</div>
+    <div class="stat-sub" id="event-summary">No events yet</div>
+  </div>
+  <div class="score-card">
+    <div class="score-label">THREATS DETECTED</div>
+    <div class="stat-value" id="threats-detected" style="color:var(--red);">0</div>
+    <div class="stat-sub" id="threat-summary">No threats</div>
+  </div>
+  <div class="score-card">
+    <div class="score-label">ACTIVE LAYERS</div>
+    <div class="stat-value" id="active-layers" style="color:var(--green);">0</div>
+    <div class="stat-sub" id="layer-list">--</div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn demo" id="demo-btn" onclick="startDemo()">DEMO MODE</button>
+  <button class="ctrl-btn export" id="export-btn" onclick="exportPdf()">EXPORT PDF</button>
+  <button class="ctrl-btn" id="replay-btn" onclick="toggleReplay()" disabled>REPLAY</button>
+  <span class="demo-status" id="demo-status"></span>
+</div>
+
+<div class="replay-panel" id="replay-panel">
+  <div class="replay-title">ATTACK REPLAY</div>
+  <select id="replay-select" style="background:#030000;color:var(--amber);border:1px solid #2a1000;
+    font-family:'Share Tech Mono';font-size:0.7rem;padding:0.3rem;margin-bottom:0.6rem;width:100%;">
+    <option value="">Select a request to replay...</option>
+  </select>
+  <div class="timeline" id="timeline"></div>
+  <div class="replay-controls">
+    <button class="ctrl-btn" onclick="replayStep()">STEP</button>
+    <button class="ctrl-btn" onclick="replayAll()">PLAY ALL</button>
+    <button class="ctrl-btn" onclick="closeReplay()">CLOSE</button>
+  </div>
+</div>
+
+<div class="comparison-panel" id="comparison-panel">
+  <div class="comp-title">MODEL RESPONSE COMPARISON</div>
+  <div class="comp-grid" id="comp-grid"></div>
+</div>
+
+<div class="feed-section">
+  <div class="feed-label">LIVE EVENT FEED</div>
+  <div class="feed" id="event-feed">
+    <div class="empty">
+      <div class="empty-icon">&#9737;</div>
+      <div class="empty-text">NO SECURITY EVENTS YET<br>SEND A MESSAGE OR RUN DEMO MODE</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_KEY = localStorage.getItem('kitt_api_key') || '';
+const AUTH = API_KEY ? {'Authorization': `Bearer ${API_KEY}`} : {};
+let ws = null;
+let wsRetries = 0;
+let replayEvents = [];
+let replayIdx = 0;
+let demoRunning = false;
+
+// --- DASHBOARD DATA ---
+async function refresh() {
+  try {
+    const r = await fetch('/api/dashboard', {headers: AUTH});
+    if (r.status === 401 || r.status === 403) { showBanner('Authentication required. Click the key icon on the chat page.', 'error'); return; }
+    const d = await r.json();
+    updatePosture(d.posture_score);
+    updateStats(d.stats, d.total_events);
+    updateFeed(d.events);
+    if (!d.bus_available) showBanner('Event bus unavailable — Redis may be down', 'error');
+  } catch(e) { showBanner('Dashboard unavailable: ' + e.message, 'error'); }
+}
+
+function updatePosture(p) {
+  const el = document.getElementById('posture-score');
+  el.textContent = p.score;
+  el.className = 'score-value ' + p.rating.toLowerCase();
+  document.getElementById('posture-rating').textContent = p.rating.toUpperCase();
+  const bd = p.breakdown;
+  document.getElementById('posture-breakdown').innerHTML =
+    `<span>Layers:</span> ${bd.layers_active}/40 <span>Detection:</span> ${bd.detection_rate}/30<br>` +
+    `<span>Accuracy:</span> ${bd.accuracy}/20 <span>Identity:</span> ${bd.identity}/10`;
+}
+
+function updateStats(s, total) {
+  document.getElementById('total-events').textContent = total;
+  document.getElementById('threats-detected').textContent = s.flagged;
+  const w = s.by_severity?.warning || 0;
+  const c = s.by_severity?.critical || 0;
+  document.getElementById('threat-summary').textContent = `${w} warnings, ${c} critical`;
+  document.getElementById('event-summary').textContent =
+    Object.entries(s.by_layer || {}).map(([k,v]) => `${k}: ${v}`).join(', ') || 'No events';
+  const layers = Object.keys(s.by_layer || {});
+  document.getElementById('active-layers').textContent = layers.length;
+  document.getElementById('layer-list').textContent = layers.join(', ') || '--';
+}
+
+function updateFeed(events) {
+  const feed = document.getElementById('event-feed');
+  if (!events || events.length === 0) return;
+  feed.innerHTML = '';
+  // Reverse so newest is on top
+  for (const e of [...events].reverse()) {
+    const row = document.createElement('div');
+    row.className = `event-row severity-${e.severity}`;
+    row.dataset.requestId = e.request_id || '';
+    const ts = e.ts ? e.ts.substring(11, 19) : '';
+    const det = typeof e.details === 'object' ?
+      Object.entries(e.details).map(([k,v]) => `${k}=${typeof v==='object'?JSON.stringify(v):v}`).join(' ') :
+      String(e.details);
+    row.innerHTML = `
+      <span class="event-ts">${ts}</span>
+      <span class="event-layer">${e.layer}</span>
+      <span class="event-type">${e.type}</span>
+      <span class="event-detail">${esc(det)}</span>
+      <span class="event-sev ${e.severity}">${e.severity.toUpperCase()}</span>`;
+    row.onclick = () => { if (e.request_id) loadReplay(e.request_id); };
+    feed.appendChild(row);
+  }
+  document.getElementById('replay-btn').disabled = false;
+}
+
+// --- DEMO MODE ---
+async function startDemo() {
+  if (demoRunning) return;
+  demoRunning = true;
+  const btn = document.getElementById('demo-btn');
+  btn.disabled = true;
+  btn.textContent = 'RUNNING...';
+  const status = document.getElementById('demo-status');
+  try {
+    const r = await fetch('/api/demo', {method:'POST', headers:{...AUTH, 'Content-Type':'application/json'},
+      body: JSON.stringify({})});
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const d = JSON.parse(line.slice(6));
+          status.textContent = `Payload ${d.index}/${d.total}: ${d.category || ''} ${d.status || ''}`;
+          debouncedRefresh();
+        } catch {}
+      }
+    }
+    status.textContent = 'DEMO COMPLETE';
+    refresh();
+  } catch(e) { status.textContent = 'DEMO ERROR: ' + e.message; }
+  btn.disabled = false;
+  btn.textContent = 'DEMO MODE';
+  demoRunning = false;
+}
+
+// --- PDF EXPORT ---
+async function exportPdf() {
+  try {
+    const r = await fetch('/api/report/pdf', {headers: AUTH});
+    if (!r.ok) { showBanner('PDF generation failed: ' + (await r.text()), 'error'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `kitt-security-report-${new Date().toISOString().slice(0,10)}.pdf`;
+    a.click(); URL.revokeObjectURL(url);
+  } catch(e) { showBanner('Export failed: ' + e.message, 'error'); }
+}
+
+// --- REPLAY ---
+async function toggleReplay() {
+  const panel = document.getElementById('replay-panel');
+  if (panel.classList.contains('active')) { closeReplay(); return; }
+  panel.classList.add('active');
+  try {
+    const r = await fetch('/api/replay/requests', {headers: AUTH});
+    const reqs = await r.json();
+    const sel = document.getElementById('replay-select');
+    sel.innerHTML = '<option value="">Select a request to replay...</option>';
+    for (const req of reqs) {
+      const opt = document.createElement('option');
+      opt.value = req.request_id;
+      const flag = req.flagged ? ' [FLAGGED]' : '';
+      opt.textContent = `${req.ts.substring(0,19)} | ${req.event_count} events | ${req.layers.join(',')}${flag}`;
+      sel.appendChild(opt);
+    }
+    sel.onchange = () => { if (sel.value) loadReplay(sel.value); };
+  } catch(e) { showBanner('Could not load replay data', 'error'); }
+}
+
+async function loadReplay(requestId) {
+  const panel = document.getElementById('replay-panel');
+  panel.classList.add('active');
+  try {
+    const r = await fetch(`/api/replay/${requestId}`, {headers: AUTH});
+    replayEvents = await r.json();
+    replayIdx = 0;
+    renderTimeline();
+    // Load model comparison if available
+    const responses = replayEvents.filter(e => e.type === 'response' && e.layer === 'fan_out');
+    if (responses.length > 0) showComparison(responses);
+  } catch(e) { showBanner('Replay load failed', 'error'); }
+}
+
+function renderTimeline() {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  for (let i = 0; i < replayEvents.length; i++) {
+    const e = replayEvents[i];
+    const div = document.createElement('div');
+    div.className = 'timeline-event' + (i < replayIdx ? ' played' : '') + (i === replayIdx ? ' active' : '');
+    const ts = e.ts ? e.ts.substring(11, 19) : '';
+    div.innerHTML = `<div class="timeline-dot"></div>
+      <div class="timeline-info">
+        <span class="timeline-layer">${e.layer}</span>
+        <span style="color:var(--text-dim);font-size:0.6rem;"> ${ts} | ${e.type}</span>
+        <div style="font-size:0.65rem;color:var(--text);margin-top:2px;">${esc(JSON.stringify(e.details).substring(0,100))}</div>
+      </div>`;
+    tl.appendChild(div);
+  }
+}
+
+function replayStep() {
+  if (replayIdx < replayEvents.length) replayIdx++;
+  renderTimeline();
+}
+
+async function replayAll() {
+  for (let i = replayIdx; i < replayEvents.length; i++) {
+    replayIdx = i + 1;
+    renderTimeline();
+    await sleep(400);
+  }
+}
+
+function closeReplay() {
+  document.getElementById('replay-panel').classList.remove('active');
+  document.getElementById('comparison-panel').classList.remove('active');
+  replayEvents = []; replayIdx = 0;
+}
+
+function showComparison(responses) {
+  const panel = document.getElementById('comparison-panel');
+  const grid = document.getElementById('comp-grid');
+  panel.classList.add('active');
+  grid.innerHTML = '';
+  const colors = {claude:'#ff6b35',openai:'#00ff41',gemini:'#4488ff',grok:'#cc44ff',perplexity:'#00ccff',local:'#ffcc00'};
+  for (const r of responses) {
+    const model = r.details?.model || 'unknown';
+    const text = r.details?.response || r.details?.error || 'No response';
+    const card = document.createElement('div');
+    card.className = 'comp-card';
+    card.innerHTML = `<div class="comp-card-header" style="color:${colors[model]||'var(--text)'}">${model.toUpperCase()}</div>
+      <div class="comp-card-body">${esc(text)}</div>`;
+    grid.appendChild(card);
+  }
+}
+
+// --- WEBSOCKET ---
+function connectWs() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const token = API_KEY ? `?token=${encodeURIComponent(API_KEY)}` : '';
+  ws = new WebSocket(`${proto}://${location.host}/ws/events${token}`);
+  ws.onmessage = (msg) => {
+    try {
+      const e = JSON.parse(msg.data);
+      if (e.type === 'event') debouncedRefresh();
+    } catch {}
+  };
+  ws.onopen = () => { wsRetries = 0; };
+  ws.onclose = () => {
+    if (wsRetries < 3) { wsRetries++; setTimeout(connectWs, 1000 * Math.pow(2, wsRetries)); }
+  };
+}
+
+// --- UTILS ---
+function showBanner(msg, type) {
+  const area = document.getElementById('banner-area');
+  area.innerHTML = `<div class="banner ${type}">${esc(msg)}</div>`;
+  setTimeout(() => area.innerHTML = '', 8000);
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+let _refreshTimer = null;
+function debouncedRefresh() {
+  if (_refreshTimer) return;
+  _refreshTimer = setTimeout(() => { _refreshTimer = null; refresh(); }, 1000);
+}
+
+// --- INIT ---
+refresh();
+setInterval(refresh, 5000);
+connectWs();
+</script>
+</body>
+</html>

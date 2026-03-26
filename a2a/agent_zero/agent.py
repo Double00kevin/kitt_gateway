@@ -12,6 +12,12 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
+# Add project root for events module
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from events import bus
+from events.detectors import run_all_detectors
+from shared.health import check_services
+
 # --- CONFIGURATION ---
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MCP_URL = "http://localhost:8000"
@@ -32,7 +38,7 @@ class AgentZero:
         pass
 
     # ------------------------------------------------------------------ #
-    # TELEMETRY & LOGGING (unchanged)
+    # TELEMETRY & LOGGING
     # ------------------------------------------------------------------ #
 
     def get_real_telemetry(self):
@@ -40,7 +46,7 @@ class AgentZero:
             uptime = subprocess.check_output("uptime", shell=True).decode().strip()
             docker_count = subprocess.check_output("docker ps -q | wc -l", shell=True).decode().strip()
             return f"Server Load: {uptime} | Active Containers: {docker_count}"
-        except:
+        except Exception:
             return "Telemetry Error: Blind."
 
     def system_health_check(self) -> dict:
@@ -55,20 +61,10 @@ class AgentZero:
             status["uptime"] = "unavailable"
             status["containers_running"] = -1
 
-        try:
-            r = requests.get(f"{MCP_URL}/health", timeout=2)
-            status["mcp"] = "ok" if r.status_code == 200 else "degraded"
-        except Exception:
-            status["mcp"] = "down"
-
-        try:
-            r = requests.get("http://localhost:11434/api/tags", timeout=2)
-            status["ollama"] = "ok" if r.status_code == 200 else "degraded"
-        except Exception:
-            status["ollama"] = "down"
-
+        checks = check_services()
+        status.update(checks)
         status["overall"] = "ok" if all(
-            status.get(k) == "ok" for k in ["mcp", "ollama"]
+            v == "ok" for v in checks.values()
         ) else "degraded"
         return status
 
@@ -213,7 +209,7 @@ class AgentZero:
     # INTENT GATE
     # ------------------------------------------------------------------ #
 
-    def check_intent(self, prompt: str) -> dict:
+    def check_intent(self, prompt: str, request_id: str = "") -> dict:
         """
         Pre-screen prompt via llama3.2 before fan_out().
         Returns {flagged: bool, reason: str, score: float}.
@@ -239,17 +235,32 @@ class AgentZero:
             raw = r.json().get("response", "").strip()
             result = json.loads(raw)
             flagged = bool(result.get("flagged", False))
-            return {
+            intent = {
                 "flagged": flagged,
                 "reason": result.get("category", "none"),
                 "score": float(result.get("confidence", 0.0))
             }
+            # Emit intent gate event
+            bus.emit("intent_gate", "flag", {
+                "category": intent["reason"],
+                "confidence": intent["score"],
+                "flagged": intent["flagged"],
+                "prompt_hash": hashlib.sha256(prompt.encode()).hexdigest()[:16],
+            }, severity="warning" if flagged else "info", request_id=request_id)
+            return intent
         except Exception as e:
             self.log_to_journal(f"[INTENT GATE] check_intent error (fail-open): {e}")
+            # Emit gate_error event
+            bus.emit("intent_gate", "flag", {
+                "category": "gate_error",
+                "confidence": 0.0,
+                "flagged": False,
+                "error": str(e)[:100],
+            }, severity="warning", request_id=request_id)
             return {"flagged": False, "reason": "gate_error", "score": 0.0}
 
     def _log_flagged_intent(self, prompt: str, intent: dict):
-        """Log flagged intent to ATS audit log, MCP, and systemd journal."""
+        """Log flagged intent to ATS audit log, MCP, and systemd journal (dual-write)."""
         log_file = os.path.expanduser("~/kitt_gateway/governance/telemetry/ats_audit.log")
         logger = logging.getLogger("intent_gate")
         if not logger.handlers:
@@ -285,16 +296,23 @@ class AgentZero:
     # FAN-OUT ORCHESTRATION
     # ------------------------------------------------------------------ #
 
-    def fan_out(self, prompt: str, models: list = None) -> dict:
+    def fan_out(self, prompt: str, models: list = None, request_id: str = "") -> dict:
         """
         Send prompt to specified models (or all if None).
         Stores prompt + responses in MCP memory.
-        Returns dict of {model_name: response}.
+        Emits events to Redis Streams for each stage.
         """
         if models is None:
             models = ["claude", "openai", "gemini", "grok", "perplexity"]
 
-        intent = self.check_intent(prompt)
+        # Run prompt-level detectors (PII, exfiltration)
+        prompt_findings = run_all_detectors(prompt, is_response=False)
+        for finding in prompt_findings:
+            bus.emit("detectors", "detection", finding,
+                     severity="warning", request_id=request_id)
+
+        # Intent gate
+        intent = self.check_intent(prompt, request_id=request_id)
         if intent["flagged"]:
             self._log_flagged_intent(prompt, intent)
 
@@ -313,16 +331,47 @@ class AgentZero:
         valid_models = [m for m in models if m in model_map]
         self.log_to_journal(f"Dispatching to {len(valid_models)} model(s) in parallel: {valid_models}")
 
+        # Emit dispatch event
+        bus.emit("fan_out", "dispatch", {
+            "models": valid_models,
+            "prompt_length": len(prompt),
+        }, severity="info", request_id=request_id)
+
         results = {}
         with ThreadPoolExecutor(max_workers=len(valid_models)) as executor:
             futures = {executor.submit(model_map[m]): m for m in valid_models}
             for future in as_completed(futures):
                 model = futures[future]
-                results[model] = future.result()
+                response = future.result()
+                results[model] = response
                 self.log_to_journal(f"{model} responded.")
+
+                # Emit per-model response event
+                is_error = isinstance(response, str) and response.startswith("[") and "Error" in response
+                bus.emit("fan_out", "response", {
+                    "model": model,
+                    "response": response[:500],  # truncate for event bus
+                    "error": is_error,
+                    "length": len(response),
+                }, severity="warning" if is_error else "info", request_id=request_id)
+
+                # Run response-level detectors (indirect injection, PII in response)
+                response_findings = run_all_detectors(response, is_response=True)
+                for finding in response_findings:
+                    finding["source_model"] = model
+                    bus.emit("detectors", "detection", finding,
+                             severity="warning", request_id=request_id)
 
         for model, response in results.items():
             self.store_context(json.dumps({"role": "assistant", "source": model, "content": response}))
+
+        # Emit request complete audit event
+        flags_count = len(prompt_findings) + (1 if intent["flagged"] else 0)
+        bus.emit("audit", "request_complete", {
+            "models_responded": len(results),
+            "flags": flags_count,
+            "intent_flagged": intent["flagged"],
+        }, severity="info", request_id=request_id)
 
         return {"responses": results, "intent": intent}
 
@@ -337,7 +386,7 @@ class AgentZero:
                 entry = json.loads(item) if isinstance(item, str) else item
                 if entry.get("role") in ("user", "assistant"):
                     messages.append({"role": entry["role"], "content": entry["content"]})
-            except:
+            except (json.JSONDecodeError, KeyError, TypeError):
                 continue
         return messages
 
@@ -377,11 +426,15 @@ _agent_instance = AgentZero()
 class FanOutRequest(BaseModel):
     prompt: str
     models: Optional[List[str]] = None
+    request_id: Optional[str] = ""
 
 
 @api.post("/fan_out")
 def fan_out_endpoint(req: FanOutRequest):
-    return _agent_instance.fan_out(prompt=req.prompt, models=req.models)
+    return _agent_instance.fan_out(
+        prompt=req.prompt, models=req.models,
+        request_id=req.request_id or "",
+    )
 
 
 if __name__ == "__main__":

@@ -40,8 +40,9 @@ shared_context/*.rdb
 docker_data/
 *.log
 
-# Claude Code project context (internal)
-.claude/
+# Claude Code (track CLAUDE.md, ignore everything else)
+.claude/*
+!.claude/CLAUDE.md
 
 # gstack security reports and analytics (local only)
 .gstack/
