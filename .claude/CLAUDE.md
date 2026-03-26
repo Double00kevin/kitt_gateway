@@ -114,5 +114,9 @@ When asked to "close the loop":
 1. `git log -1 --oneline` to get latest commit.
 2. Update "Last updated" date at top of this file.
 3. Append summary to `docs/changelog.md` with commit hash.
-4. Verify matching roadmap item is checked off.
-5. Stage, commit (`docs: close the loop for [hash]`), and push.
+4. Verify matching roadmap item is checked off in `docs/roadmap.md`.
+5. Verify `README.md` reflects current capabilities — update if stale.
+6. Verify `docs/architecture.md` reflects current structure, data flows, and security posture — update if stale.
+7. Verify `docs/intelligence_archive/00_MASTER_INDEX.md` is current if a security audit was performed.
+8. Check all other docs in `docs/` for staleness against what just shipped.
+9. Stage, commit (`docs: close the loop for [hash]`), and push.
