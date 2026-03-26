@@ -1,15 +1,40 @@
 import sys
 import os
+import hmac
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Header, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import requests
 from pydantic import BaseModel
 from typing import Optional, List
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+# --- Rate Limiter ---
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="KITT Hub")
+app.state.limiter = limiter
 
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Max 10 requests per minute."})
+
+# --- Auth ---
+HUB_API_KEY = os.getenv("KITT_HUB_API_KEY", "")
+
+def verify_api_key(authorization: str = Header(None)):
+    if not HUB_API_KEY:
+        return  # auth disabled if no key configured
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    token = authorization.removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(token, HUB_API_KEY):
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+# --- Config ---
 AGENT_URL = "http://127.0.0.1:9001"
 USE_DIRECT = os.getenv("USE_DIRECT_AGENT_ZERO", "false").lower() == "true"
 
@@ -56,7 +81,8 @@ def health():
     return JSONResponse(status_code=code, content={"status": overall, "service": "kitt-hub", "checks": checks})
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+@limiter.limit("10/minute")
+def chat(request: ChatRequest, raw_request: Request, _auth=Depends(verify_api_key)):
     if USE_DIRECT:
         result = _direct_agent.fan_out(prompt=request.prompt, models=request.models)
     else:

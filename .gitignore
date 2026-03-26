@@ -42,3 +42,6 @@ docker_data/
 
 # Claude Code project context (internal)
 .claude/
+
+# gstack security reports and analytics (local only)
+.gstack/
