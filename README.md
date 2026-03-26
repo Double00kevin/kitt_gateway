@@ -39,6 +39,14 @@ Most AI agent frameworks (OpenClaw, LangGraph, CrewAI) focus on what agents *do*
 
 **Intent-based threat screening** — Every prompt is pre-screened by a local LLM (llama3.2) before fan-out. Flags prompt injection, jailbreak attempts, and unsafe content. Flag-only (never blocks) with full audit trail.
 
+**Live Threat Defense Dashboard** — Real-time security visibility with event aggregation, severity breakdown, and a security posture score (0-100). WebSocket live streaming for continuous monitoring, SSE-driven demo mode for live attack simulations, and attack replay theater for forensic walkthroughs.
+
+**Attack payload library** — 30+ pre-built attack payloads mapped to the OWASP LLM Top 10 (prompt injection, jailbreak, data exfiltration, role confusion, and more). Used for demo mode, red team training, and detection validation.
+
+**PDF security report export** — Board-ready posture assessment with attack replay timeline, severity breakdown, and posture scoring. One-click export from the dashboard for leave-behind artifacts.
+
+**Threat detection pipeline** — Regex-based detectors for PII (SSN, email, phone, credit card), data exfiltration patterns (base64, URL encoding), and indirect prompt injection. Runs as a separate pipeline stage after the intent gate, with all findings logged to the Redis Streams audit trail.
+
 **Governance and kill switch** — ISO 42001-aligned emergency cessation. One script stops all inference and communication while preserving memory and identity state.
 
 **Air-gap capable** — Core operation requires zero external dependencies. All inference can fall back to Ollama + llama3.2 running on a local GPU.
@@ -46,16 +54,23 @@ Most AI agent frameworks (OpenClaw, LangGraph, CrewAI) focus on what agents *do*
 ## Architecture
 
 ```
-Browser → KITT Hub (:8080)
+Browser → KITT Hub (:8080) ─→ Bearer token auth + rate limiting
               │
-              └→ Agent Zero HTTP (:9001) ─→ fan_out()
-                       │
-                       ├→ check_intent() ─→ Ollama/llama3.2 (local screening)
-                       │
-                       ├→ MCP Server (:8000) ─→ Redis blackboard (:6379)
-                       │
-                       ├→ Claude, GPT-4o, Gemini, Grok, Perplexity (external)
-                       └→ Ollama (:11434) (local inference)
+              ├→ Agent Zero HTTP (:9001) ─→ fan_out()
+              │        │
+              │        ├→ check_intent() ─→ Ollama/llama3.2 (local screening)
+              │        │
+              │        ├→ MCP Server (:8000) ─→ Redis blackboard (:6379)
+              │        │
+              │        ├→ Claude, GPT-4o, Gemini, Grok, Perplexity (external)
+              │        └→ Ollama (:11434) (local inference)
+              │
+              └→ Events pipeline
+                       ├→ Redis Streams (kitt:events) ─→ structured audit trail
+                       ├→ Threat detectors ─→ PII, exfiltration, injection
+                       ├→ Dashboard aggregation ─→ posture score (0-100)
+                       ├→ WebSocket (/ws/events) ─→ live event stream
+                       └→ PDF report export ─→ board-ready artifact
 
 Identity: SPIRE Server (:8081) → SPIRE Agent → workload SVIDs
 A2A:      nginx proxy (:9000) → /.well-known/agent-card.json
@@ -82,13 +97,30 @@ All internal services bind to loopback. Only the Hub (LAN) and A2A proxy (public
 - Intent gate screening all prompts via local llama3.2
 - Agent Zero running as decoupled HTTP service (systemd-managed)
 - Hub chat UI with intent metadata in responses
+- Bearer token auth (KITT_HUB_API_KEY) on all Hub API endpoints
+- Rate limiting (10 req/min per IP on /chat via slowapi)
+- Live Threat Defense Dashboard with real-time event feed
+- Redis Streams event bus (kitt:events) with structured emit/read
+- Threat detectors: PII, data exfiltration, indirect prompt injection
+- Security posture scoring (0-100) with severity breakdown
+- Attack payload library (30+ OWASP LLM Top 10 mapped)
+- SSE demo mode (/api/demo) for live attack simulations
+- Attack replay theater (/api/replay) for forensic walkthroughs
+- PDF security report export (/api/report/pdf)
+- WebSocket live event streaming (/ws/events)
+- Comparative model response view (side-by-side multi-model output)
 - Kill switch stopping inference + comms while preserving state
+- 83 tests across 6 test files (pytest)
 - 3-2-1 automated backup (local SSD + GitHub)
 
 **In progress:**
 - A2A agent-card endpoints reference localhost (need LAN-resolvable addresses)
 - Edge router capabilities (PII masking, local routing) declared but not implemented
 - Post-quantum crypto (ML-KEM-768) declared in agent cards, not yet in stack
+
+**Planned:**
+- SIEM export (JSON webhook + syslog forwarding)
+- SPIRE mTLS enforcement between Agent Zero and MCP Server
 
 See [docs/roadmap.md](docs/roadmap.md) for the full status breakdown.
 
@@ -137,7 +169,10 @@ sudo systemctl enable --now kitt-hub kitt-agent kitt-agent-http
 - **Container hardening:** `no-new-privileges: true`, non-root users, read-only config mounts
 - **Network isolation:** Internal services on loopback only, external surface minimized
 - **Intent screening:** Local LLM pre-screens every prompt before external dispatch
-- **Audit trail:** All flagged events logged to append-only ATS audit log
+- **Bearer token auth:** HMAC-based API key on all Hub endpoints, WebSocket auth via query param
+- **Rate limiting:** 10 req/min per IP on /chat (slowapi)
+- **Audit trail:** All events logged to append-only Redis Streams with TTL retention
+- **Threat detection:** Regex-based PII, exfiltration, and injection detectors on every request
 - **Emergency cessation:** Kill switch halts inference and comms, preserves identity and memory
 - **Default deny firewall:** UFW baseline with SSH restricted to LAN
 
