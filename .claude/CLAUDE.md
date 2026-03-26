@@ -1,5 +1,5 @@
 # KITT Sovereign Gateway — Project Context
-> Last updated: 2026-03-26
+> Last updated: 2026-03-26 (33da6be)
 
 KITT Sovereign Gateway is a sovereign AI agent security control plane for AI infrastructure. It provides multi-model fan-out dispatch with intent screening (llama3.2), SPIFFE/SPIRE zero-trust identity, a Redis blackboard for shared state, and a Hub UI with a live threat defense dashboard. Built for enterprise AI security consulting via MadProjX.
 

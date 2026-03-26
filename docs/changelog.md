@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-03-26 (uncommitted — pending /ship)
+## 2026-03-26 — `33da6be`
 
 - **feat: Live Threat Defense Dashboard — full implementation**
   - Redis Streams event bus (`events/bus.py`) — structured security event pipeline with `kitt:events` stream
