@@ -18,6 +18,7 @@ KITT Gateway secures AI agent infrastructure by screening every prompt through a
 | `a2a/` | Agent-to-Agent protocol — Agent Zero daemon + registry |
 | `a2a_proxy/` | nginx proxy for A2A discovery (`/.well-known/agent-card.json`) |
 | `config/` | Configuration files and kernel tripwire checks |
+| `decisions/` | Architecture Decision Records (ADRs) |
 | `docs/` | Changelog, roadmap, architecture, intelligence archive |
 | `events/` | Redis Streams event bus, threat detectors, dashboard aggregation, PDF reports, attack payloads |
 | `governance/` | Kill switch (ISO 42001 cessation protocol) and audit logging |
@@ -91,13 +92,24 @@ KITT Hub (FastAPI, systemd)
 - **P2:** SPIRE mTLS enforcement — mutual TLS between Agent Zero and MCP Server using SVIDs (~30 min)
 - **P3:** Health check dedup — shared/health.py extracted, wire remaining consumers
 
+## Key References
+
+- Changelog: `docs/changelog.md`
+- Roadmap: `docs/roadmap.md`
+- Architecture: `docs/architecture.md`
+- Decision log: `decisions/`
+- Intelligence archive: `docs/intelligence_archive/`
+- TODOs: `TODOS.md`
+
 ## Conventions
 
 - snake_case for Python modules, kebab-case for service/config files
 - No secrets in repo — ever (env vars via .env, KITT_HUB_API_KEY for auth)
 - Security-first: least privilege, validate inputs, fail-open on non-critical deps
 - Every change gets a changelog entry in `docs/changelog.md`
+- Log significant decisions (architecture, tool choice, trade-offs) as YYYY-MM-DD-short-description.md in `decisions/`
 - Tests live in `tests/` with `test_*.py` naming
+- Rules in `.claude/rules/` are loaded at the same priority as this file
 
 ## Obsidian Vault (Knowledge Base)
 
